@@ -85,7 +85,7 @@ function renderSelectedMemberPanel() {
   }
 
   selectedMemberInfo.classList.remove('empty');
-  selectedMemberInfo.textContent = `${member.photo_emoji} ${member.name}`;
+  selectedMemberInfo.textContent = `${member.photo_emoji}`;
 
   principalAmount.textContent = money(draft.principal);
   interestAmount.textContent = money(draft.interest);
