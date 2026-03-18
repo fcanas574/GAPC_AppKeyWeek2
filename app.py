@@ -171,8 +171,8 @@ def seed_if_needed(conn: sqlite3.Connection) -> None:
 	rows = conn.execute("SELECT id FROM members ORDER BY id").fetchall()
 	demo_loans = []
 	for idx, member in enumerate(rows, start=1):
-		principal_total = float(8 + idx)
-		interest_total = float(1 + (idx % 3) * 0.5)
+		principal_total = round(1.0 + (idx * 0.4), 2)
+		interest_total = round(0.10 + (idx % 3) * 0.05, 2)
 		demo_loans.append((member["id"], principal_total, interest_total))
 
 	conn.executemany(
@@ -360,7 +360,7 @@ def get_state() -> dict[str, Any]:
 			"id": meeting["id"],
 			"started_at": meeting["started_at"],
 		},
-		"denominations": [0.25, 0.5, 1, 2, 5],
+		"denominations": [0.01, 0.05, 0.10, 0.25, 1, 5, 10],
 		"members": member_cards,
 	}
 
