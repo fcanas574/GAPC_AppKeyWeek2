@@ -13,6 +13,10 @@ const statusMsg = document.getElementById('statusMsg');
 const newMeetingBtn = document.getElementById('newMeetingBtn');
 const resetDemoBtn = document.getElementById('resetDemoBtn');
 const ttsToggleBtn = document.getElementById('ttsToggleBtn');
+const openMemberAdminBtn = document.getElementById('openMemberAdminBtn');
+const memberAdminModal = document.getElementById('memberAdminModal');
+const memberAdminBackdrop = document.getElementById('memberAdminBackdrop');
+const closeMemberAdminBtn = document.getElementById('closeMemberAdminBtn');
 const memberForm = document.getElementById('memberForm');
 const memberMode = document.getElementById('memberMode');
 const memberGenderSelect = document.getElementById('memberGenderSelect');
@@ -43,6 +47,8 @@ const speechSupported =
 let ttsEnabled = loadTtsPreference();
 let preferredVoice = null;
 let lastSpeech = { text: '', timestamp: 0 };
+let speechFailureStreak = 0;
+let speechRetryInProgress = false;
 const SpeechRecognitionCtor =
   typeof window !== 'undefined'
     ? window.SpeechRecognition || window.webkitSpeechRecognition || null
@@ -51,6 +57,7 @@ const nameSttSupported = Boolean(SpeechRecognitionCtor);
 let nameRecognizer = null;
 let nameListening = false;
 let nameBaseValue = '';
+let memberWizardLastStep = '';
 
 const coinImageByValue = {
   '0.01': '/static/static/images/coins/1c_c.jpg',
@@ -178,10 +185,33 @@ function pickSpanishVoice() {
   return scored[0]?.voice || spanishVoices[0];
 }
 
+function touchSpeechEngine() {
+  if (!speechSupported) {
+    return;
+  }
+
+  try {
+    // Warm up voice list and unpause engine if the browser left it paused.
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.resume();
+  } catch (error) {
+    // Ignore transient browser speech errors.
+  }
+}
+
+function buildUtterance(message, voice) {
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = voice.lang;
+  utterance.rate = 0.9;
+  utterance.pitch = 1.08;
+  utterance.voice = voice;
+  return utterance;
+}
+
 function amountToSpeech(value) {
   const safeValue = Number(value);
   if (!Number.isFinite(safeValue)) {
-    return '0 dolares';
+    return '0 dólares';
   }
 
   const abs = Math.abs(safeValue);
@@ -193,14 +223,14 @@ function amountToSpeech(value) {
   }
 
   if (dollars > 0 && cents === 0) {
-    return `${dollars} ${dollars === 1 ? 'dolar' : 'dolares'}`;
+    return `${dollars} ${dollars === 1 ? 'dólar' : 'dólares'}`;
   }
 
   if (dollars > 0 && cents > 0) {
-    return `${dollars} ${dollars === 1 ? 'dolar' : 'dolares'} con ${cents} centavos`;
+    return `${dollars} ${dollars === 1 ? 'dólar' : 'dólares'} con ${cents} centavos`;
   }
 
-  return '0 dolares';
+  return '0 dólares';
 }
 
 function updateTtsButton() {
@@ -221,8 +251,8 @@ function updateTtsButton() {
   const hasSpanishVoice = Boolean(preferredVoice || pickSpanishVoice());
   if (!hasSpanishVoice) {
     ttsToggleBtn.innerHTML = '<span class="audio-icon" aria-hidden="true">🔇</span>';
-    ttsToggleBtn.setAttribute('aria-label', 'Sin voz en espanol');
-    ttsToggleBtn.setAttribute('title', 'Sin voz en espanol');
+    ttsToggleBtn.setAttribute('aria-label', 'Sin voz en español');
+    ttsToggleBtn.setAttribute('title', 'Sin voz en español');
     ttsToggleBtn.classList.add('unsupported');
     ttsToggleBtn.disabled = true;
     return;
@@ -245,6 +275,8 @@ function speak(message, priority = 'normal') {
   if (!speechSupported || !ttsEnabled || !message) {
     return;
   }
+
+  touchSpeechEngine();
 
   const normalized = String(message).trim();
   if (!normalized) {
@@ -269,11 +301,45 @@ function speak(message, priority = 'normal') {
     return;
   }
 
-  const utterance = new SpeechSynthesisUtterance(normalized);
-  utterance.lang = preferredVoice.lang;
-  utterance.rate = 0.9;
-  utterance.pitch = 1.08;
-  utterance.voice = preferredVoice;
+  const utterance = buildUtterance(normalized, preferredVoice);
+  utterance.onstart = () => {
+    speechFailureStreak = 0;
+    speechRetryInProgress = false;
+  };
+  utterance.onerror = () => {
+    speechFailureStreak += 1;
+    if (speechRetryInProgress || speechFailureStreak > 2 || !ttsEnabled) {
+      return;
+    }
+
+    speechRetryInProgress = true;
+    setTimeout(() => {
+      if (!speechSupported || !ttsEnabled) {
+        speechRetryInProgress = false;
+        return;
+      }
+
+      touchSpeechEngine();
+      preferredVoice = pickSpanishVoice() || preferredVoice;
+      if (!preferredVoice) {
+        speechRetryInProgress = false;
+        updateTtsButton();
+        return;
+      }
+
+      const retryUtterance = buildUtterance(normalized, preferredVoice);
+      retryUtterance.onstart = () => {
+        speechFailureStreak = 0;
+        speechRetryInProgress = false;
+      };
+      retryUtterance.onerror = () => {
+        speechRetryInProgress = false;
+      };
+
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(retryUtterance);
+    }, 120);
+  };
 
   window.speechSynthesis.speak(utterance);
 }
@@ -284,12 +350,28 @@ function initTts() {
     return;
   }
 
+  touchSpeechEngine();
   preferredVoice = pickSpanishVoice();
   updateTtsButton();
   window.speechSynthesis.onvoiceschanged = () => {
+    touchSpeechEngine();
     preferredVoice = pickSpanishVoice();
     updateTtsButton();
   };
+
+  window.addEventListener('pageshow', () => {
+    touchSpeechEngine();
+    preferredVoice = pickSpanishVoice() || preferredVoice;
+    updateTtsButton();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      touchSpeechEngine();
+      preferredVoice = pickSpanishVoice() || preferredVoice;
+      updateTtsButton();
+    }
+  });
 }
 
 function updateNameVoiceButton() {
@@ -356,7 +438,7 @@ function initNameSpeechToText() {
   };
 
   nameRecognizer.onerror = () => {
-    setStatus('No se pudo usar el microfono para dictar nombre', 'error');
+    setStatus('No se pudo usar el micrófono para dictar nombre', 'error');
   };
 
   nameRecognizer.onend = () => {
@@ -388,6 +470,57 @@ function setStatus(message, type = '') {
   if (type) {
     statusMsg.classList.add(type);
   }
+}
+
+function speakWizardStep(stepKey, message) {
+  if (memberWizardLastStep === stepKey) {
+    return;
+  }
+  memberWizardLastStep = stepKey;
+  speak(message, 'critical');
+}
+
+function openMemberAdminModal() {
+  if (!memberAdminModal) {
+    return;
+  }
+
+  memberAdminModal.classList.remove('hidden');
+  memberAdminModal.setAttribute('aria-hidden', 'false');
+  memberWizardLastStep = '';
+  speakWizardStep(
+    'open',
+    'Añadir nuevo miembro. Paso 1: seleccione el modo, nuevo socio o socio existente.',
+  );
+}
+
+function closeMemberAdminModal() {
+  if (!memberAdminModal) {
+    return;
+  }
+
+  memberAdminModal.classList.add('hidden');
+  memberAdminModal.setAttribute('aria-hidden', 'true');
+  memberWizardLastStep = '';
+}
+
+function announceMemberWizardStep() {
+  const mode = memberMode?.value || 'new';
+  const gender = normalizeGender(memberGenderSelect?.value);
+  const noun = memberNoun(gender);
+
+  if (mode === 'new') {
+    speakWizardStep(
+      `step-new-${gender}`,
+      `Paso 2: género ${noun}. Paso 3: escriba el nombre del nuevo ${noun}.`,
+    );
+    return;
+  }
+
+  speakWizardStep(
+    `step-existing-${gender}`,
+    `Paso 2: elija el ${noun} existente. Paso 3: ajuste préstamo e interés.`,
+  );
 }
 
 function getSelectedMember() {
@@ -445,7 +578,7 @@ function renderMeeting() {
     return;
   }
   const started = new Date(state.meeting.started_at).toLocaleString();
-  meetingBadge.textContent = `Reunion ${state.meeting.id} | ${started}`;
+  meetingBadge.textContent = `Reunión ${state.meeting.id} | ${started}`;
 }
 
 function memberPhotoMarkup(member, cssClass, altText) {
@@ -687,7 +820,7 @@ function speakRemainingForTarget(target) {
     return;
   }
 
-  const targetLabel = target === 'principal' ? 'principal' : 'interes';
+  const targetLabel = target === 'principal' ? 'principal' : 'interés';
   if (remaining >= 0) {
     speak(`En ${targetLabel}, falta ${amountToSpeech(remaining)}`);
   } else {
@@ -712,7 +845,7 @@ function addToDraft(target, value) {
     draft.interest = +(draft.interest + value).toFixed(2);
   }
   setStatus('Monto agregado', 'ok');
-  const targetLabel = target === 'principal' ? 'principal' : 'interes';
+  const targetLabel = target === 'principal' ? 'principal' : 'interés';
   speak(`Agregado ${amountToSpeech(value)} a ${targetLabel}`);
   renderSelectedMemberPanel();
 }
@@ -757,8 +890,8 @@ async function savePayment() {
   }
 
   if (draft.principal === 0 && draft.interest === 0) {
-    setStatus('Pago vacio', 'error');
-    speak('Pago vacio', 'critical');
+    setStatus('Pago vacío', 'error');
+    speak('Pago vacío', 'critical');
     return;
   }
 
@@ -784,7 +917,7 @@ async function savePayment() {
     } else {
       setStatus('Pago guardado', 'ok');
       speak(
-        `Pago guardado. Principal ${amountToSpeech(paidPrincipal)}. Interes ${amountToSpeech(paidInterest)}.`,
+        `Pago guardado. Principal ${amountToSpeech(paidPrincipal)}. Interés ${amountToSpeech(paidInterest)}.`,
       );
     }
   } catch (error) {
@@ -800,8 +933,8 @@ async function startNewMeeting() {
     ensureSelectedMember();
     hydrateDraftFromState();
     renderAll();
-    setStatus('Nueva reunion iniciada', 'ok');
-    speak('Nueva reunion iniciada');
+    setStatus('Nueva reunión iniciada', 'ok');
+    speak('Nueva reunión iniciada');
   } catch (error) {
     setStatus(error.message, 'error');
     speak(error.message, 'critical');
@@ -845,6 +978,8 @@ function handleMemberModeChange() {
       updateMemberModeLabels();
     }
   }
+
+  announceMemberWizardStep();
 }
 
 async function saveMember(event) {
@@ -898,8 +1033,9 @@ async function saveMember(event) {
     renderAll();
     const savedMember = getSelectedMember();
     const noun = memberNoun(savedMember?.gender || memberGenderSelect?.value);
-    setStatus(`${memberNounCapitalized(savedMember?.gender || memberGenderSelect?.value)} y prestamo guardados`, 'ok');
-    speak(`${noun} y prestamo guardados`);
+    setStatus(`${memberNounCapitalized(savedMember?.gender || memberGenderSelect?.value)} y préstamo guardados`, 'ok');
+    speak(`${noun} y préstamo guardados`);
+    closeMemberAdminModal();
 
     if (memberPhotoInput) {
       memberPhotoInput.value = '';
@@ -956,7 +1092,10 @@ function bindAdminTokenRack(rackElement, target) {
     if (!token) {
       return;
     }
-    addToLoanInput(target, Number(token.dataset.value));
+    const value = Number(token.dataset.value);
+    addToLoanInput(target, value);
+    const targetLabel = target === 'principal' ? 'préstamo' : 'interés';
+    speak(`Monto añadido a ${targetLabel}: ${amountToSpeech(value)}.`, 'critical');
   });
 }
 
@@ -1038,11 +1177,44 @@ newMeetingBtn.addEventListener('click', startNewMeeting);
 if (resetDemoBtn) {
   resetDemoBtn.addEventListener('click', resetDemoData);
 }
+if (openMemberAdminBtn) {
+  openMemberAdminBtn.addEventListener('click', () => {
+    openMemberAdminModal();
+    if (memberMode) {
+      memberMode.focus();
+    }
+  });
+}
+if (closeMemberAdminBtn) {
+  closeMemberAdminBtn.addEventListener('click', closeMemberAdminModal);
+}
+if (memberAdminBackdrop) {
+  memberAdminBackdrop.addEventListener('click', closeMemberAdminModal);
+}
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeMemberAdminModal();
+  }
+});
 if (memberMode) {
-  memberMode.addEventListener('change', handleMemberModeChange);
+  memberMode.addEventListener('change', () => {
+    handleMemberModeChange();
+    const label = memberMode.value === 'existing' ? 'socio existente' : 'nuevo socio';
+    speak(`Modo seleccionado: ${label}.`, 'critical');
+  });
+  memberMode.addEventListener('focus', () => {
+    speakWizardStep('focus-mode', 'Paso 1: seleccione el modo de registro.');
+  });
 }
 if (memberGenderSelect) {
-  memberGenderSelect.addEventListener('change', handleMemberModeChange);
+  memberGenderSelect.addEventListener('change', () => {
+    handleMemberModeChange();
+    const noun = memberNoun(memberGenderSelect.value);
+    speak(`Paso 2: género seleccionado, ${noun}.`, 'critical');
+  });
+  memberGenderSelect.addEventListener('focus', () => {
+    speakWizardStep('focus-gender', 'Paso 2: seleccione el género del socio.');
+  });
 }
 if (existingMemberSelect) {
   existingMemberSelect.addEventListener('change', () => {
@@ -1062,16 +1234,51 @@ if (existingMemberSelect) {
       memberNameInput.value = member.name;
     }
     handleMemberModeChange();
+    speak(`Socio seleccionado: ${member.name}.`, 'critical');
+  });
+  existingMemberSelect.addEventListener('focus', () => {
+    speakWizardStep('focus-existing', 'Paso 3: elija el socio existente que desea actualizar.');
   });
 }
 if (clearPrincipalBtn) {
-  clearPrincipalBtn.addEventListener('click', () => clearLoanInput('principal'));
+  clearPrincipalBtn.addEventListener('click', () => {
+    clearLoanInput('principal');
+    speak('Préstamo limpiado.', 'critical');
+  });
 }
 if (clearInterestBtn) {
-  clearInterestBtn.addEventListener('click', () => clearLoanInput('interest'));
+  clearInterestBtn.addEventListener('click', () => {
+    clearLoanInput('interest');
+    speak('Interés limpiado.', 'critical');
+  });
 }
 if (memberForm) {
   memberForm.addEventListener('submit', saveMember);
+}
+if (memberNameInput) {
+  memberNameInput.addEventListener('focus', () => {
+    speakWizardStep('focus-name', 'Paso 3: escriba el nombre del socio.');
+  });
+}
+if (principalTotalInput) {
+  principalTotalInput.addEventListener('focus', () => {
+    speakWizardStep('focus-principal', 'Paso 4: indique el monto del préstamo.');
+  });
+}
+if (interestTotalInput) {
+  interestTotalInput.addEventListener('focus', () => {
+    speakWizardStep('focus-interest', 'Paso 5: indique el monto del interés.');
+  });
+}
+if (memberPhotoInput) {
+  memberPhotoInput.addEventListener('focus', () => {
+    speakWizardStep('focus-photo', 'Paso 6: puede añadir una foto opcional.');
+  });
+  memberPhotoInput.addEventListener('change', () => {
+    if (memberPhotoInput.files && memberPhotoInput.files.length) {
+      speak('Foto añadida.', 'critical');
+    }
+  });
 }
 
 initTts();

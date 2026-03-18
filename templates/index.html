@@ -19,12 +19,12 @@
       <header class="top-bar">
         <div class="brand-block">
           <p class="kicker">GAPC</p>
-          <h1>Control Visual de Reunion</h1>
+          <h1>Control Visual de Reunión</h1>
         </div>
         <div class="meeting-block">
           <button id="newMeetingBtn" class="pill-btn action-new" type="button">
             <span class="btn-icon" aria-hidden="true">🔄</span>
-            <span class="btn-label">Nueva Reunion</span>
+            <span class="btn-label">Nueva Reunión</span>
           </button>
           <button id="resetDemoBtn" class="reset-btn action-reset" type="button">
             <span class="btn-icon" aria-hidden="true">↺</span>
@@ -46,10 +46,37 @@
         <article class="members-panel card">
           <div class="section-title-row">
             <h2>Socios y Socias</h2>
+            <button
+              id="openMemberAdminBtn"
+              class="open-member-admin-btn"
+              type="button"
+              aria-label="Añadir o gestionar socio"
+              title="Añadir o gestionar socio"
+            >
+              +
+            </button>
           </div>
 
-          <details class="member-admin">
-            <summary>+ Gestionar Socios y Prestamos</summary>
+          <div id="memberGrid" class="member-grid"></div>
+        </article>
+
+        <div id="memberAdminModal" class="member-admin-modal hidden" aria-hidden="true">
+          <div id="memberAdminBackdrop" class="member-admin-backdrop"></div>
+          <section class="member-admin-dialog" role="dialog" aria-modal="true" aria-labelledby="memberAdminTitle">
+            <div class="member-admin-header">
+              <h3 id="memberAdminTitle">Añadir o Gestionar Socios y Préstamos</h3>
+              <button
+                id="closeMemberAdminBtn"
+                class="close-member-admin-btn"
+                type="button"
+                aria-label="Cerrar gestión"
+                title="Cerrar gestión"
+              >
+                ×
+              </button>
+            </div>
+            <p class="member-admin-step-hint">Sigue los pasos: modo, género, nombre, préstamo e interés.</p>
+
             <form id="memberForm" class="member-form" enctype="multipart/form-data">
               <div class="member-form-row">
                 <label for="memberMode">Modo</label>
@@ -60,7 +87,7 @@
               </div>
 
               <div class="member-form-row">
-                <label for="memberGenderSelect">Genero</label>
+                <label for="memberGenderSelect">Género</label>
                 <select id="memberGenderSelect" name="gender">
                   <option value="female">Socia</option>
                   <option value="male">Socio</option>
@@ -90,7 +117,7 @@
 
               <div class="member-form-row two-cols">
                 <div>
-                  <label for="principalTotalInput">Prestamo</label>
+                  <label for="principalTotalInput">Préstamo</label>
                   <input
                     id="principalTotalInput"
                     name="principal_total"
@@ -107,12 +134,12 @@
                       type="button"
                       data-target="principal"
                     >
-                      Limpiar prestamo
+                      Limpiar préstamo
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label for="interestTotalInput">Interes</label>
+                  <label for="interestTotalInput">Interés</label>
                   <input
                     id="interestTotalInput"
                     name="interest_total"
@@ -129,7 +156,7 @@
                       type="button"
                       data-target="interest"
                     >
-                      Limpiar interes
+                      Limpiar interés
                     </button>
                   </div>
                 </div>
@@ -140,28 +167,26 @@
                 <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
               </div>
 
-              <button type="submit" class="member-save-btn">Guardar Socio/a y Prestamo</button>
+              <button type="submit" class="member-save-btn">Guardar Socio/a y Préstamo</button>
             </form>
-          </details>
-
-          <div id="memberGrid" class="member-grid"></div>
-        </article>
+          </section>
+        </div>
 
         <article class="payment-panel card">
           <div class="section-title-row">
-            <h2>Pago de Prestamo</h2>
+            <h2>Pago de Préstamo</h2>
           </div>
 
           <div id="selectedMemberInfo" class="selected-member empty">
-            Seleccione una socia
+            Seleccione un socio o socia
           </div>
 
           <div class="wallet-row">
             <button id="jarPrincipalBtn" class="jar-toggle active" data-target="principal">
-              Alcancia Grande
+              Alcancía Grande
             </button>
             <button id="jarInterestBtn" class="jar-toggle" data-target="interest">
-              Alcancia Pequena
+              Alcancía Pequeña
             </button>
           </div>
 
@@ -174,7 +199,7 @@
             </div>
             <div id="jarInterest" class="jar jar-interest" data-target="interest">
               <p class="jar-icon">🫙</p>
-              <p class="jar-name">Interes</p>
+              <p class="jar-name">Interés</p>
               <p id="interestAmount" class="jar-amount">$0.00</p>
               <p id="interestRemaining" class="jar-remaining"></p>
             </div>
