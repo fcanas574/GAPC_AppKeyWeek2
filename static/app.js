@@ -154,7 +154,9 @@ function updateTtsButton() {
 
   ttsToggleBtn.classList.remove('off', 'unsupported');
   if (!speechSupported) {
-    ttsToggleBtn.textContent = 'Voz: NO';
+    ttsToggleBtn.innerHTML = '<span class="audio-icon" aria-hidden="true">🔇</span>';
+    ttsToggleBtn.setAttribute('aria-label', 'Voz no disponible');
+    ttsToggleBtn.setAttribute('title', 'Voz no disponible');
     ttsToggleBtn.classList.add('unsupported');
     ttsToggleBtn.disabled = true;
     return;
@@ -162,7 +164,9 @@ function updateTtsButton() {
 
   const hasSpanishVoice = Boolean(preferredVoice || pickSpanishVoice());
   if (!hasSpanishVoice) {
-    ttsToggleBtn.textContent = 'Voz: SIN ES';
+    ttsToggleBtn.innerHTML = '<span class="audio-icon" aria-hidden="true">🔇</span>';
+    ttsToggleBtn.setAttribute('aria-label', 'Sin voz en espanol');
+    ttsToggleBtn.setAttribute('title', 'Sin voz en espanol');
     ttsToggleBtn.classList.add('unsupported');
     ttsToggleBtn.disabled = true;
     return;
@@ -170,9 +174,13 @@ function updateTtsButton() {
 
   ttsToggleBtn.disabled = false;
   if (ttsEnabled) {
-    ttsToggleBtn.textContent = 'Voz: ON';
+    ttsToggleBtn.innerHTML = '<span class="audio-icon" aria-hidden="true">🔊</span>';
+    ttsToggleBtn.setAttribute('aria-label', 'Voz activada');
+    ttsToggleBtn.setAttribute('title', 'Voz activada');
   } else {
-    ttsToggleBtn.textContent = 'Voz: OFF';
+    ttsToggleBtn.innerHTML = '<span class="audio-icon" aria-hidden="true">🔈</span>';
+    ttsToggleBtn.setAttribute('aria-label', 'Voz desactivada');
+    ttsToggleBtn.setAttribute('title', 'Voz desactivada');
     ttsToggleBtn.classList.add('off');
   }
 }
@@ -287,6 +295,9 @@ function hydrateDraftFromState() {
 }
 
 function renderMeeting() {
+  if (!meetingBadge) {
+    return;
+  }
   const started = new Date(state.meeting.started_at).toLocaleString();
   meetingBadge.textContent = `Reunion ${state.meeting.id} | ${started}`;
 }
@@ -343,11 +354,30 @@ function renderSelectedMemberPanel() {
   interestRemaining.textContent = `Falta: ${money(interestLeft)}`;
 }
 
-function tokenTemplate(value) {
-  const normalized = Number(value).toFixed(2);
+function tokenTemplate(tokenEntry) {
+  const value = Number(tokenEntry.value);
+  const normalized = value.toFixed(2);
   const coinSrc = coinImageByValue[normalized];
   const billSrc = billImageByValue[normalized];
-  const numeric = Number(value);
+  const numeric = value;
+
+  if (tokenEntry.kind === 'coin' && coinSrc) {
+    return `
+      <button class="money-token" draggable="true" data-value="${value}" title="${money(value)}">
+        <img class="coin-image" src="${coinSrc}" alt="Moneda ${money(value)}" />
+        <span class="coin-value">${money(value)}</span>
+      </button>
+    `;
+  }
+
+  if (tokenEntry.kind === 'bill' && billSrc) {
+    return `
+      <button class="money-token bill-token" draggable="true" data-value="${value}" title="${money(value)}">
+        <img class="bill-image" src="${billSrc}" alt="Billete ${money(value)}" />
+        <span class="coin-value">${money(value)}</span>
+      </button>
+    `;
+  }
 
   if (coinSrc) {
     return `
@@ -380,7 +410,21 @@ function tokenTemplate(value) {
 }
 
 function renderTokens() {
-  tokenRack.innerHTML = state.denominations.map(tokenTemplate).join('');
+  const tokenEntries = [];
+  for (const denomination of state.denominations) {
+    const normalized = Number(denomination).toFixed(2);
+
+    // For $1 we intentionally show both coin and bill variants.
+    if (normalized === '1.00') {
+      tokenEntries.push({ value: 1, kind: 'coin' });
+      tokenEntries.push({ value: 1, kind: 'bill' });
+      continue;
+    }
+
+    tokenEntries.push({ value: denomination, kind: 'auto' });
+  }
+
+  tokenRack.innerHTML = tokenEntries.map(tokenTemplate).join('');
 }
 
 function renderJarSelection() {

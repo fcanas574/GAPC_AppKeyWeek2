@@ -22,10 +22,23 @@
           <h1>Control Visual de Reunion</h1>
         </div>
         <div class="meeting-block">
-          <div id="meetingBadge" class="meeting-badge"></div>
-          <button id="newMeetingBtn" class="pill-btn">Nueva reunion</button>
-          <button id="resetDemoBtn" class="reset-btn" type="button">Reset Demo</button>
-          <button id="ttsToggleBtn" class="audio-btn" type="button">Voz: ON</button>
+          <button id="newMeetingBtn" class="pill-btn action-new" type="button">
+            <span class="btn-icon" aria-hidden="true">🔄</span>
+            <span class="btn-label">Nueva Reunion</span>
+          </button>
+          <button id="resetDemoBtn" class="reset-btn action-reset" type="button">
+            <span class="btn-icon" aria-hidden="true">↺</span>
+            <span class="btn-label">Reset Demo</span>
+          </button>
+          <button
+            id="ttsToggleBtn"
+            class="audio-btn"
+            type="button"
+            aria-label="Voz activada"
+            title="Voz activada"
+          >
+            <span class="audio-icon" aria-hidden="true">🔊</span>
+          </button>
         </div>
       </header>
 
