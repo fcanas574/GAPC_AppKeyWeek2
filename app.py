@@ -37,6 +37,11 @@ def create_app() -> Flask:
 		meeting_id = start_new_meeting()
 		return jsonify({"ok": True, "meeting_id": meeting_id, "state": get_state()})
 
+	@app.post("/api/demo/reset")
+	def api_demo_reset() -> Any:
+		reset_database()
+		return jsonify({"ok": True, "state": get_state()})
+
 	@app.post("/api/attendance")
 	def api_attendance() -> Any:
 		payload = request.get_json(silent=True) or {}

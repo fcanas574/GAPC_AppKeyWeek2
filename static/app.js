@@ -11,6 +11,7 @@ const interestRemaining = document.getElementById('interestRemaining');
 const tokenRack = document.getElementById('tokenRack');
 const statusMsg = document.getElementById('statusMsg');
 const newMeetingBtn = document.getElementById('newMeetingBtn');
+const resetDemoBtn = document.getElementById('resetDemoBtn');
 const ttsToggleBtn = document.getElementById('ttsToggleBtn');
 const resetDraftBtn = document.getElementById('resetDraftBtn');
 const savePaymentBtn = document.getElementById('savePaymentBtn');
@@ -18,7 +19,7 @@ const jarPrincipalBtn = document.getElementById('jarPrincipalBtn');
 const jarInterestBtn = document.getElementById('jarInterestBtn');
 const jars = document.querySelectorAll('.jar');
 
-let selectedMemberId = state.members.length ? state.members[0].id : null;
+let selectedMemberId = null;
 let activeJar = 'principal';
 let draft = { principal: 0, interest: 0 };
 const speechSupported =
@@ -38,8 +39,10 @@ const coinImageByValue = {
 };
 
 const billImageByValue = {
-  '5.00': '/static/static/images/bills/1_b2.jpg',
-  '10.00': '/static/static/images/bills/1_b3.jpg',
+  '1.00': '/static/static/images/bills/1_b1.jpg',
+  '5.00': '/static/static/images/bills/5_b3.jpg',
+  '10.00': '/static/static/images/bills/10_b4.jpg',
+  '20.00': '/static/static/images/bills/20_b2.jpg',
 };
 
 function money(value) {
@@ -235,6 +238,36 @@ function setStatus(message, type = '') {
 
 function getSelectedMember() {
   return state.members.find((member) => member.id === selectedMemberId) || null;
+}
+
+function memberHasPending(member) {
+  return (
+    member.loan.principal_remaining > 0 ||
+    member.loan.interest_remaining > 0 ||
+    member.loan.current_payment.principal > 0 ||
+    member.loan.current_payment.interest > 0
+  );
+}
+
+function pickBestMemberId() {
+  const withPending = state.members.find((member) => memberHasPending(member));
+  if (withPending) {
+    return withPending.id;
+  }
+  return state.members.length ? state.members[0].id : null;
+}
+
+function ensureSelectedMember() {
+  if (!state.members.length) {
+    selectedMemberId = null;
+    return;
+  }
+
+  const selectedExists = state.members.some((member) => member.id === selectedMemberId);
+  const current = getSelectedMember();
+  if (!selectedExists || !current || !memberHasPending(current)) {
+    selectedMemberId = pickBestMemberId();
+  }
 }
 
 function getMemberById(memberId) {
@@ -448,9 +481,7 @@ async function updateAttendance(memberId, status) {
   try {
     const data = await postJson('/api/attendance', { member_id: memberId, status });
     state = data.state;
-    if (!state.members.find((m) => m.id === selectedMemberId) && state.members.length) {
-      selectedMemberId = state.members[0].id;
-    }
+    ensureSelectedMember();
     hydrateDraftFromState();
     renderAll();
     setStatus('Asistencia actualizada', 'ok');
@@ -487,6 +518,7 @@ async function savePayment() {
       interest: draft.interest,
     });
     state = data.state;
+    ensureSelectedMember();
     hydrateDraftFromState();
     renderAll();
     setStatus('Pago guardado', 'ok');
@@ -503,11 +535,26 @@ async function startNewMeeting() {
   try {
     const data = await postJson('/api/meeting/new', {});
     state = data.state;
-    selectedMemberId = state.members.length ? state.members[0].id : null;
+    ensureSelectedMember();
     hydrateDraftFromState();
     renderAll();
     setStatus('Nueva reunion iniciada', 'ok');
     speak('Nueva reunion iniciada');
+  } catch (error) {
+    setStatus(error.message, 'error');
+    speak(error.message, 'critical');
+  }
+}
+
+async function resetDemoData() {
+  try {
+    const data = await postJson('/api/demo/reset', {});
+    state = data.state;
+    ensureSelectedMember();
+    hydrateDraftFromState();
+    renderAll();
+    setStatus('Demo reiniciado', 'ok');
+    speak('Demo reiniciado', 'critical');
   } catch (error) {
     setStatus(error.message, 'error');
     speak(error.message, 'critical');
@@ -618,8 +665,12 @@ if (ttsToggleBtn) {
 
 savePaymentBtn.addEventListener('click', savePayment);
 newMeetingBtn.addEventListener('click', startNewMeeting);
+if (resetDemoBtn) {
+  resetDemoBtn.addEventListener('click', resetDemoData);
+}
 
 initTts();
+ensureSelectedMember();
 hydrateDraftFromState();
 renderAll();
 setStatus('Lista para registrar', 'ok');

@@ -100,6 +100,15 @@ h1 {
   cursor: pointer;
 }
 
+.reset-btn {
+  border: 2px solid var(--stroke);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #f9d9b8;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .audio-btn.off {
   background: #f2d7d7;
 }
@@ -359,19 +368,22 @@ h2 {
 
 .coin-value {
   position: absolute;
-  bottom: 1px;
+  bottom: 4px;
   left: 50%;
   transform: translateX(-50%);
-  min-width: 44px;
-  padding: 1px 6px;
+  min-width: 62px;
+  padding: 2px 7px;
   border: 1px solid var(--stroke);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
-  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.98);
+  font-size: 0.78rem;
   font-weight: 900;
   line-height: 1.2;
+  white-space: nowrap;
+  color: #141414;
   pointer-events: none;
   z-index: 2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
 }
 
 .bill-token {
@@ -392,7 +404,8 @@ h2 {
 }
 
 .bill-token .coin-value {
-  bottom: 4px;
+  bottom: 6px;
+  min-width: 70px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
