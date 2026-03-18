@@ -45,8 +45,105 @@
       <section class="layout-grid">
         <article class="members-panel card">
           <div class="section-title-row">
-            <h2>Socias</h2>
+            <h2>Socios y Socias</h2>
           </div>
+
+          <details class="member-admin">
+            <summary>+ Gestionar Socios y Prestamos</summary>
+            <form id="memberForm" class="member-form" enctype="multipart/form-data">
+              <div class="member-form-row">
+                <label for="memberMode">Modo</label>
+                <select id="memberMode" name="mode">
+                  <option value="new">Nuevo socio/a</option>
+                  <option value="existing">Socio/a existente</option>
+                </select>
+              </div>
+
+              <div class="member-form-row">
+                <label for="memberGenderSelect">Genero</label>
+                <select id="memberGenderSelect" name="gender">
+                  <option value="female">Socia</option>
+                  <option value="male">Socio</option>
+                </select>
+              </div>
+
+              <div id="existingMemberWrap" class="member-form-row hidden">
+                <label for="existingMemberSelect">Socio/a</label>
+                <select id="existingMemberSelect" name="member_id"></select>
+              </div>
+
+              <div class="member-form-row">
+                <label for="memberNameInput">Nombre</label>
+                <div class="name-input-with-voice">
+                  <input id="memberNameInput" name="name" type="text" maxlength="40" />
+                  <button
+                    id="nameVoiceBtn"
+                    class="name-voice-btn"
+                    type="button"
+                    aria-label="Dictar nombre"
+                    title="Dictar nombre"
+                  >
+                    🎤
+                  </button>
+                </div>
+              </div>
+
+              <div class="member-form-row two-cols">
+                <div>
+                  <label for="principalTotalInput">Prestamo</label>
+                  <input
+                    id="principalTotalInput"
+                    name="principal_total"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                  <div class="loan-picker-block">
+                    <div id="adminPrincipalTokens" class="admin-token-rack" data-target="principal"></div>
+                    <button
+                      id="clearPrincipalBtn"
+                      class="mini-clear-btn"
+                      type="button"
+                      data-target="principal"
+                    >
+                      Limpiar prestamo
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label for="interestTotalInput">Interes</label>
+                  <input
+                    id="interestTotalInput"
+                    name="interest_total"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                  <div class="loan-picker-block">
+                    <div id="adminInterestTokens" class="admin-token-rack" data-target="interest"></div>
+                    <button
+                      id="clearInterestBtn"
+                      class="mini-clear-btn"
+                      type="button"
+                      data-target="interest"
+                    >
+                      Limpiar interes
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="member-form-row">
+                <label for="memberPhotoInput">Foto</label>
+                <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
+              </div>
+
+              <button type="submit" class="member-save-btn">Guardar Socio/a y Prestamo</button>
+            </form>
+          </details>
+
           <div id="memberGrid" class="member-grid"></div>
         </article>
 

@@ -6,11 +6,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, url_for
+from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "gapc.db"
+UPLOADS_DIR = BASE_DIR / "static" / "uploads"
 
 
 def utc_now_iso() -> str:
@@ -63,7 +65,7 @@ def create_app() -> Flask:
 		interest = payload.get("interest")
 
 		if not isinstance(member_id, int):
-			return jsonify({"ok": False, "error": "Socia invalida"}), 400
+			return jsonify({"ok": False, "error": "Socio/a invalido/a"}), 400
 
 		try:
 			principal_value = round(float(principal), 2)
@@ -84,11 +86,86 @@ def create_app() -> Flask:
 		cap_principal, cap_interest = get_member_remaining(member_id)
 		cap_principal += existing_principal
 		cap_interest += existing_interest
-		if principal_value > cap_principal + 0.001 or interest_value > cap_interest + 0.001:
-			return jsonify({"ok": False, "error": "Sobrepago detectado"}), 400
 
-		save_or_update_payment(meeting_id, member_id, principal_value, interest_value)
-		return jsonify({"ok": True, "state": get_state()})
+		applied_principal = round(min(principal_value, cap_principal), 2)
+		applied_interest = round(min(interest_value, cap_interest), 2)
+		change_principal = round(max(0.0, principal_value - applied_principal), 2)
+		change_interest = round(max(0.0, interest_value - applied_interest), 2)
+
+		save_or_update_payment(meeting_id, member_id, applied_principal, applied_interest)
+		return jsonify(
+			{
+				"ok": True,
+				"state": get_state(),
+				"payment_summary": {
+					"entered": {
+						"principal": principal_value,
+						"interest": interest_value,
+					},
+					"applied": {
+						"principal": applied_principal,
+						"interest": applied_interest,
+					},
+					"change": {
+						"principal": change_principal,
+						"interest": change_interest,
+						"total": round(change_principal + change_interest, 2),
+					},
+				},
+			}
+		)
+
+	@app.post("/api/member/save")
+	def api_member_save() -> Any:
+		mode = (request.form.get("mode") or "new").strip().lower()
+		member_id_raw = request.form.get("member_id")
+		name = (request.form.get("name") or "").strip()
+		gender = normalize_gender(request.form.get("gender"))
+		principal_raw = request.form.get("principal_total")
+		interest_raw = request.form.get("interest_total")
+		photo = request.files.get("photo")
+
+		try:
+			principal_total = round(float(principal_raw), 2)
+			interest_total = round(float(interest_raw), 2)
+		except (TypeError, ValueError):
+			return jsonify({"ok": False, "error": "Monto de prestamo invalido"}), 400
+
+		if principal_total < 0 or interest_total < 0:
+			return jsonify({"ok": False, "error": "Monto de prestamo invalido"}), 400
+
+		if mode not in {"new", "existing"}:
+			return jsonify({"ok": False, "error": "Modo invalido"}), 400
+
+		if mode == "new" and not name:
+			return jsonify({"ok": False, "error": "Nombre requerido"}), 400
+
+		if mode == "existing" and not member_id_raw:
+			return jsonify({"ok": False, "error": "Socio/a requerido/a"}), 400
+
+		member_id: int | None = None
+		if mode == "existing":
+			try:
+				member_id = int(member_id_raw)
+			except (TypeError, ValueError):
+				return jsonify({"ok": False, "error": "Socio/a invalido/a"}), 400
+
+		photo_path = save_uploaded_photo(photo)
+
+		try:
+			saved_member_id = create_or_update_member(
+				mode=mode,
+				member_id=member_id,
+				name=name,
+				gender=gender,
+				principal_total=principal_total,
+				interest_total=interest_total,
+				photo_path=photo_path,
+			)
+		except ValueError as error:
+			return jsonify({"ok": False, "error": str(error)}), 400
+
+		return jsonify({"ok": True, "member_id": saved_member_id, "state": get_state()})
 
 	return app
 
@@ -100,6 +177,7 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+	UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 	with get_connection() as conn:
 		conn.executescript(
 			"""
@@ -147,7 +225,137 @@ def init_db() -> None:
 			"""
 		)
 
+		ensure_schema_migrations(conn)
+
 		seed_if_needed(conn)
+
+
+def ensure_schema_migrations(conn: sqlite3.Connection) -> None:
+	columns = conn.execute("PRAGMA table_info(members)").fetchall()
+	column_names = {column["name"] for column in columns}
+	if "photo_path" not in column_names:
+		conn.execute("ALTER TABLE members ADD COLUMN photo_path TEXT")
+	if "gender" not in column_names:
+		conn.execute("ALTER TABLE members ADD COLUMN gender TEXT NOT NULL DEFAULT 'female'")
+
+
+def normalize_gender(gender: str | None) -> str:
+	value = (gender or "female").strip().lower()
+	if value in {"male", "m"}:
+		return "male"
+	return "female"
+
+
+def default_emoji_for_gender(gender: str) -> str:
+	return "👨" if gender == "male" else "👩"
+
+
+def save_uploaded_photo(photo: Any) -> str | None:
+	if not photo or not getattr(photo, "filename", ""):
+		return None
+
+	filename = secure_filename(str(photo.filename))
+	if not filename:
+		return None
+
+	suffix = Path(filename).suffix.lower()
+	if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+		return None
+
+	timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+	final_name = f"member_{timestamp}{suffix}"
+	destination = UPLOADS_DIR / final_name
+	photo.save(destination)
+	return final_name
+
+
+def create_or_update_member(
+	*,
+	mode: str,
+	member_id: int | None,
+	name: str,
+	gender: str,
+	principal_total: float,
+	interest_total: float,
+	photo_path: str | None,
+) -> int:
+	with get_connection() as conn:
+		if mode == "new":
+			existing_by_name = conn.execute(
+				"""
+				SELECT id, photo_path, gender
+				FROM members
+				WHERE lower(trim(name)) = lower(trim(?))
+				ORDER BY id
+				LIMIT 1
+				""",
+				(name,),
+			).fetchone()
+
+			if existing_by_name:
+				existing_id = int(existing_by_name["id"])
+				final_photo = photo_path if photo_path else existing_by_name["photo_path"]
+				final_gender = normalize_gender(gender if gender else existing_by_name["gender"])
+				emoji = default_emoji_for_gender(final_gender)
+				conn.execute(
+					"UPDATE members SET name = ?, photo_path = ?, gender = ?, photo_emoji = ? WHERE id = ?",
+					(name, final_photo, final_gender, emoji, existing_id),
+				)
+				conn.execute(
+					"""
+					INSERT INTO loans(member_id, principal_total, interest_total)
+					VALUES (?, ?, ?)
+					ON CONFLICT(member_id)
+					DO UPDATE SET
+						principal_total = excluded.principal_total,
+						interest_total = excluded.interest_total
+					""",
+					(existing_id, principal_total, interest_total),
+				)
+				return existing_id
+
+			emoji = default_emoji_for_gender(gender)
+			cursor = conn.execute(
+				"INSERT INTO members(name, photo_emoji, photo_path, gender) VALUES (?, ?, ?, ?)",
+				(name, emoji, photo_path, gender),
+			)
+			new_member_id = int(cursor.lastrowid)
+			conn.execute(
+				"INSERT INTO loans(member_id, principal_total, interest_total) VALUES (?, ?, ?)",
+				(new_member_id, principal_total, interest_total),
+			)
+			return new_member_id
+
+		if member_id is None:
+			raise ValueError("Socio/a invalido/a")
+
+		existing = conn.execute(
+			"SELECT id, name, photo_path, gender FROM members WHERE id = ?",
+			(member_id,),
+		).fetchone()
+		if not existing:
+			raise ValueError("Socio/a no encontrado/a")
+
+		final_name = name if name else str(existing["name"])
+		final_photo = photo_path if photo_path else existing["photo_path"]
+		final_gender = gender if gender else str(existing["gender"])
+		emoji = default_emoji_for_gender(final_gender)
+		conn.execute(
+			"UPDATE members SET name = ?, photo_path = ?, gender = ?, photo_emoji = ? WHERE id = ?",
+			(final_name, final_photo, final_gender, emoji, member_id),
+		)
+		conn.execute(
+			"""
+			INSERT INTO loans(member_id, principal_total, interest_total)
+			VALUES (?, ?, ?)
+			ON CONFLICT(member_id)
+			DO UPDATE SET
+				principal_total = excluded.principal_total,
+				interest_total = excluded.interest_total
+			""",
+			(member_id, principal_total, interest_total),
+		)
+		return member_id
 
 
 def reset_database() -> None:
@@ -311,6 +519,8 @@ def get_state() -> dict[str, Any]:
 				m.id,
 				m.name,
 				m.photo_emoji,
+				m.photo_path,
+				m.gender,
 				l.principal_total,
 				l.interest_total,
 				COALESCE(a.status, 'absent') AS attendance,
@@ -346,6 +556,12 @@ def get_state() -> dict[str, Any]:
 				"id": row["id"],
 				"name": row["name"],
 				"photo_emoji": row["photo_emoji"],
+				"gender": row["gender"],
+				"photo_url": (
+					url_for("static", filename=f"uploads/{row['photo_path']}")
+					if row["photo_path"]
+					else None
+				),
 				"attendance": row["attendance"],
 				"loan": {
 					"principal_total": round(row["principal_total"], 2),

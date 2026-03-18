@@ -13,6 +13,20 @@ const statusMsg = document.getElementById('statusMsg');
 const newMeetingBtn = document.getElementById('newMeetingBtn');
 const resetDemoBtn = document.getElementById('resetDemoBtn');
 const ttsToggleBtn = document.getElementById('ttsToggleBtn');
+const memberForm = document.getElementById('memberForm');
+const memberMode = document.getElementById('memberMode');
+const memberGenderSelect = document.getElementById('memberGenderSelect');
+const existingMemberWrap = document.getElementById('existingMemberWrap');
+const existingMemberSelect = document.getElementById('existingMemberSelect');
+const memberNameInput = document.getElementById('memberNameInput');
+const nameVoiceBtn = document.getElementById('nameVoiceBtn');
+const principalTotalInput = document.getElementById('principalTotalInput');
+const interestTotalInput = document.getElementById('interestTotalInput');
+const adminPrincipalTokens = document.getElementById('adminPrincipalTokens');
+const adminInterestTokens = document.getElementById('adminInterestTokens');
+const clearPrincipalBtn = document.getElementById('clearPrincipalBtn');
+const clearInterestBtn = document.getElementById('clearInterestBtn');
+const memberPhotoInput = document.getElementById('memberPhotoInput');
 const resetDraftBtn = document.getElementById('resetDraftBtn');
 const savePaymentBtn = document.getElementById('savePaymentBtn');
 const jarPrincipalBtn = document.getElementById('jarPrincipalBtn');
@@ -29,6 +43,14 @@ const speechSupported =
 let ttsEnabled = loadTtsPreference();
 let preferredVoice = null;
 let lastSpeech = { text: '', timestamp: 0 };
+const SpeechRecognitionCtor =
+  typeof window !== 'undefined'
+    ? window.SpeechRecognition || window.webkitSpeechRecognition || null
+    : null;
+const nameSttSupported = Boolean(SpeechRecognitionCtor);
+let nameRecognizer = null;
+let nameListening = false;
+let nameBaseValue = '';
 
 const coinImageByValue = {
   '0.01': '/static/static/images/coins/1c_c.jpg',
@@ -47,6 +69,40 @@ const billImageByValue = {
 
 function money(value) {
   return `$${Number(value).toFixed(2)}`;
+}
+
+function normalizeGender(gender) {
+  return gender === 'male' ? 'male' : 'female';
+}
+
+function memberNoun(gender) {
+  return normalizeGender(gender) === 'male' ? 'socio' : 'socia';
+}
+
+function memberNounCapitalized(gender) {
+  const noun = memberNoun(gender);
+  return noun.charAt(0).toUpperCase() + noun.slice(1);
+}
+
+function selectedAdjective(gender) {
+  return normalizeGender(gender) === 'male' ? 'seleccionado' : 'seleccionada';
+}
+
+function buildTokenEntries() {
+  const tokenEntries = [];
+  for (const denomination of state.denominations) {
+    const normalized = Number(denomination).toFixed(2);
+
+    if (normalized === '1.00') {
+      tokenEntries.push({ value: 1, kind: 'coin' });
+      tokenEntries.push({ value: 1, kind: 'bill' });
+      continue;
+    }
+
+    tokenEntries.push({ value: denomination, kind: 'auto' });
+  }
+
+  return tokenEntries;
 }
 
 function loadTtsPreference() {
@@ -236,6 +292,96 @@ function initTts() {
   };
 }
 
+function updateNameVoiceButton() {
+  if (!nameVoiceBtn) {
+    return;
+  }
+
+  nameVoiceBtn.classList.remove('listening', 'unsupported');
+  if (!nameSttSupported) {
+    nameVoiceBtn.disabled = true;
+    nameVoiceBtn.classList.add('unsupported');
+    nameVoiceBtn.textContent = '🚫';
+    nameVoiceBtn.setAttribute('aria-label', 'Dictado no disponible');
+    nameVoiceBtn.setAttribute('title', 'Dictado no disponible');
+    return;
+  }
+
+  nameVoiceBtn.disabled = false;
+  if (nameListening) {
+    nameVoiceBtn.classList.add('listening');
+    nameVoiceBtn.textContent = '⏹';
+    nameVoiceBtn.setAttribute('aria-label', 'Detener dictado');
+    nameVoiceBtn.setAttribute('title', 'Detener dictado');
+  } else {
+    nameVoiceBtn.textContent = '🎤';
+    nameVoiceBtn.setAttribute('aria-label', 'Dictar nombre');
+    nameVoiceBtn.setAttribute('title', 'Dictar nombre');
+  }
+}
+
+function initNameSpeechToText() {
+  updateNameVoiceButton();
+  if (!nameVoiceBtn || !nameSttSupported || !memberNameInput) {
+    return;
+  }
+
+  nameRecognizer = new SpeechRecognitionCtor();
+  nameRecognizer.lang = 'es-SV';
+  nameRecognizer.continuous = false;
+  nameRecognizer.interimResults = true;
+  nameRecognizer.maxAlternatives = 1;
+
+  nameRecognizer.onstart = () => {
+    nameListening = true;
+    nameBaseValue = String(memberNameInput.value || '').trim();
+    updateNameVoiceButton();
+    setStatus('Escuchando nombre...', 'ok');
+  };
+
+  nameRecognizer.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      transcript += event.results[i][0].transcript;
+    }
+
+    transcript = transcript.trim();
+    if (!transcript) {
+      return;
+    }
+
+    memberNameInput.value = nameBaseValue
+      ? `${nameBaseValue} ${transcript}`.replace(/\s+/g, ' ').trim()
+      : transcript;
+  };
+
+  nameRecognizer.onerror = () => {
+    setStatus('No se pudo usar el microfono para dictar nombre', 'error');
+  };
+
+  nameRecognizer.onend = () => {
+    nameListening = false;
+    updateNameVoiceButton();
+  };
+
+  nameVoiceBtn.addEventListener('click', () => {
+    if (!nameRecognizer) {
+      return;
+    }
+
+    if (nameListening) {
+      nameRecognizer.stop();
+      return;
+    }
+
+    try {
+      nameRecognizer.start();
+    } catch (error) {
+      setStatus('No se pudo iniciar dictado por voz', 'error');
+    }
+  });
+}
+
 function setStatus(message, type = '') {
   statusMsg.textContent = message;
   statusMsg.className = 'status-msg';
@@ -302,11 +448,18 @@ function renderMeeting() {
   meetingBadge.textContent = `Reunion ${state.meeting.id} | ${started}`;
 }
 
+function memberPhotoMarkup(member, cssClass, altText) {
+  if (member.photo_url) {
+    return `<img class="${cssClass}" src="${member.photo_url}" alt="${altText}" />`;
+  }
+  return member.photo_emoji;
+}
+
 function memberCardTemplate(member) {
   const selectedClass = member.id === selectedMemberId ? 'selected' : '';
   return `
     <article class="member-card ${member.attendance} ${selectedClass}" data-member-id="${member.id}">
-      <p class="member-photo">${member.photo_emoji}</p>
+      <p class="member-photo">${memberPhotoMarkup(member, 'member-photo-img', member.name)}</p>
       <p class="member-name">${member.name}</p>
       <div class="attendance-row">
         <button class="att-btn present" data-member-id="${member.id}" data-status="present">✔</button>
@@ -318,13 +471,35 @@ function memberCardTemplate(member) {
 
 function renderMembers() {
   memberGrid.innerHTML = state.members.map(memberCardTemplate).join('');
+  renderExistingMemberOptions();
+}
+
+function renderExistingMemberOptions() {
+  if (!existingMemberSelect) {
+    return;
+  }
+
+  existingMemberSelect.innerHTML = state.members
+    .map(
+      (member) =>
+        `<option value="${member.id}">${member.name} (${memberNounCapitalized(member.gender)})</option>`,
+    )
+    .join('');
+
+  const current = getSelectedMember();
+  if (current) {
+    existingMemberSelect.value = String(current.id);
+    if (memberGenderSelect) {
+      memberGenderSelect.value = normalizeGender(current.gender);
+    }
+  }
 }
 
 function renderSelectedMemberPanel() {
   const member = getSelectedMember();
   if (!member) {
     selectedMemberInfo.classList.add('empty');
-    selectedMemberInfo.textContent = 'Seleccione una socia';
+    selectedMemberInfo.textContent = 'Seleccione un socio o socia';
     principalAmount.textContent = '$0.00';
     interestAmount.textContent = '$0.00';
     principalRemaining.textContent = '';
@@ -334,24 +509,26 @@ function renderSelectedMemberPanel() {
 
   selectedMemberInfo.classList.remove('empty');
   selectedMemberInfo.innerHTML = `
-    <span class="selected-member-photo">${member.photo_emoji}</span>
+    <span class="selected-member-photo">${memberPhotoMarkup(member, 'selected-member-photo-img', member.name)}</span>
     <span class="selected-member-name">${member.name}</span>
   `;
 
   principalAmount.textContent = money(draft.principal);
   interestAmount.textContent = money(draft.interest);
 
-  const principalLeft = Math.max(
-    0,
-    member.loan.principal_remaining + member.loan.current_payment.principal - draft.principal,
-  );
-  const interestLeft = Math.max(
-    0,
-    member.loan.interest_remaining + member.loan.current_payment.interest - draft.interest,
-  );
+  const principalDelta =
+    member.loan.principal_remaining + member.loan.current_payment.principal - draft.principal;
+  const interestDelta =
+    member.loan.interest_remaining + member.loan.current_payment.interest - draft.interest;
 
-  principalRemaining.textContent = `Falta: ${money(principalLeft)}`;
-  interestRemaining.textContent = `Falta: ${money(interestLeft)}`;
+  principalRemaining.textContent =
+    principalDelta >= 0
+      ? `Falta: ${money(principalDelta)}`
+      : `Vuelto: ${money(Math.abs(principalDelta))}`;
+  interestRemaining.textContent =
+    interestDelta >= 0
+      ? `Falta: ${money(interestDelta)}`
+      : `Vuelto: ${money(Math.abs(interestDelta))}`;
 }
 
 function tokenTemplate(tokenEntry) {
@@ -410,21 +587,25 @@ function tokenTemplate(tokenEntry) {
 }
 
 function renderTokens() {
-  const tokenEntries = [];
-  for (const denomination of state.denominations) {
-    const normalized = Number(denomination).toFixed(2);
-
-    // For $1 we intentionally show both coin and bill variants.
-    if (normalized === '1.00') {
-      tokenEntries.push({ value: 1, kind: 'coin' });
-      tokenEntries.push({ value: 1, kind: 'bill' });
-      continue;
-    }
-
-    tokenEntries.push({ value: denomination, kind: 'auto' });
-  }
-
+  const tokenEntries = buildTokenEntries();
   tokenRack.innerHTML = tokenEntries.map(tokenTemplate).join('');
+}
+
+function renderAdminLoanTokens() {
+  const tokenEntries = buildTokenEntries();
+  const html = tokenEntries
+    .map((entry) => {
+      const token = tokenTemplate(entry).replace('money-token', 'money-token admin-money-token');
+      return token;
+    })
+    .join('');
+
+  if (adminPrincipalTokens) {
+    adminPrincipalTokens.innerHTML = html;
+  }
+  if (adminInterestTokens) {
+    adminInterestTokens.innerHTML = html;
+  }
 }
 
 function renderJarSelection() {
@@ -437,22 +618,53 @@ function renderAll() {
   renderMembers();
   renderSelectedMemberPanel();
   renderTokens();
+  renderAdminLoanTokens();
   renderJarSelection();
+}
+
+function addToLoanInput(target, value) {
+  if (!Number.isFinite(value)) {
+    return;
+  }
+
+  const input = target === 'principal' ? principalTotalInput : interestTotalInput;
+  if (!input) {
+    return;
+  }
+
+  const currentValue = Number.parseFloat(input.value || '0') || 0;
+  input.value = (currentValue + value).toFixed(2);
+}
+
+function clearLoanInput(target) {
+  const input = target === 'principal' ? principalTotalInput : interestTotalInput;
+  if (!input) {
+    return;
+  }
+
+  input.value = '';
+}
+
+function updateMemberModeLabels() {
+  if (!memberMode) {
+    return;
+  }
+
+  const gender = normalizeGender(memberGenderSelect?.value);
+  const noun = memberNoun(gender);
+  const nounCapitalized = memberNounCapitalized(gender);
+
+  if (memberMode.options[0]) {
+    memberMode.options[0].textContent = `Nuevo ${noun}`;
+  }
+  if (memberMode.options[1]) {
+    memberMode.options[1].textContent = `${nounCapitalized} existente`;
+  }
 }
 
 function canAddToDraft(target, value) {
   const member = getSelectedMember();
-  if (!member) {
-    return false;
-  }
-
-  const available =
-    target === 'principal'
-      ? member.loan.principal_remaining + member.loan.current_payment.principal
-      : member.loan.interest_remaining + member.loan.current_payment.interest;
-
-  const next = target === 'principal' ? draft.principal + value : draft.interest + value;
-  return next <= available + 0.001;
+  return Boolean(member);
 }
 
 function getRemainingForTarget(target) {
@@ -462,38 +674,36 @@ function getRemainingForTarget(target) {
   }
 
   if (target === 'principal') {
-    return Math.max(
-      0,
-      member.loan.principal_remaining + member.loan.current_payment.principal - draft.principal,
-    );
+    return member.loan.principal_remaining + member.loan.current_payment.principal - draft.principal;
   }
 
-  return Math.max(
-    0,
-    member.loan.interest_remaining + member.loan.current_payment.interest - draft.interest,
-  );
+  return member.loan.interest_remaining + member.loan.current_payment.interest - draft.interest;
 }
 
 function speakRemainingForTarget(target) {
   const remaining = getRemainingForTarget(target);
   if (remaining === null) {
-    speak('Seleccione una socia primero', 'critical');
+    speak('Seleccione un socio o socia primero', 'critical');
     return;
   }
 
   const targetLabel = target === 'principal' ? 'principal' : 'interes';
-  speak(`En ${targetLabel}, falta ${amountToSpeech(remaining)}`);
+  if (remaining >= 0) {
+    speak(`En ${targetLabel}, falta ${amountToSpeech(remaining)}`);
+  } else {
+    speak(`En ${targetLabel}, debe dar vuelto de ${amountToSpeech(Math.abs(remaining))}`);
+  }
 }
 
 function addToDraft(target, value) {
   if (!selectedMemberId) {
-    setStatus('Seleccione una socia primero', 'error');
-    speak('Seleccione una socia primero', 'critical');
+    setStatus('Seleccione un socio o socia primero', 'error');
+    speak('Seleccione un socio o socia primero', 'critical');
     return;
   }
   if (!canAddToDraft(target, value)) {
-    setStatus('Monto supera el pendiente', 'error');
-    speak('Monto supera el pendiente', 'critical');
+    setStatus('Seleccione un socio o socia primero', 'error');
+    speak('Seleccione un socio o socia primero', 'critical');
     return;
   }
   if (target === 'principal') {
@@ -531,7 +741,7 @@ async function updateAttendance(memberId, status) {
     setStatus('Asistencia actualizada', 'ok');
     const member = getMemberById(memberId);
     const statusLabel = status === 'present' ? 'presente' : 'ausente';
-    const memberName = member ? member.name : 'socia';
+    const memberName = member ? member.name : 'persona';
     speak(`${memberName}, ${statusLabel}`);
   } catch (error) {
     setStatus(error.message, 'error');
@@ -541,8 +751,8 @@ async function updateAttendance(memberId, status) {
 
 async function savePayment() {
   if (!selectedMemberId) {
-    setStatus('Seleccione una socia', 'error');
-    speak('Seleccione una socia', 'critical');
+    setStatus('Seleccione un socio o socia', 'error');
+    speak('Seleccione un socio o socia', 'critical');
     return;
   }
 
@@ -565,10 +775,18 @@ async function savePayment() {
     ensureSelectedMember();
     hydrateDraftFromState();
     renderAll();
-    setStatus('Pago guardado', 'ok');
-    speak(
-      `Pago guardado. Principal ${amountToSpeech(paidPrincipal)}. Interes ${amountToSpeech(paidInterest)}.`,
-    );
+
+    const summary = data.payment_summary;
+    const totalChange = summary?.change?.total || 0;
+    if (totalChange > 0) {
+      setStatus(`Pago guardado. Debe dar vuelto: ${money(totalChange)}`, 'ok');
+      speak(`Pago guardado. Debe dar vuelto de ${amountToSpeech(totalChange)}.`);
+    } else {
+      setStatus('Pago guardado', 'ok');
+      speak(
+        `Pago guardado. Principal ${amountToSpeech(paidPrincipal)}. Interes ${amountToSpeech(paidInterest)}.`,
+      );
+    }
   } catch (error) {
     setStatus(error.message, 'error');
     speak(error.message, 'critical');
@@ -605,6 +823,93 @@ async function resetDemoData() {
   }
 }
 
+function handleMemberModeChange() {
+  if (!memberMode || !existingMemberWrap || !memberNameInput) {
+    return;
+  }
+
+  updateMemberModeLabels();
+
+  const isExisting = memberMode.value === 'existing';
+  existingMemberWrap.classList.toggle('hidden', !isExisting);
+  memberNameInput.required = !isExisting;
+
+  if (isExisting && existingMemberSelect && !existingMemberSelect.value && selectedMemberId) {
+    existingMemberSelect.value = String(selectedMemberId);
+  }
+
+  if (isExisting && existingMemberSelect?.value) {
+    const member = getMemberById(Number(existingMemberSelect.value));
+    if (member && memberGenderSelect) {
+      memberGenderSelect.value = normalizeGender(member.gender);
+      updateMemberModeLabels();
+    }
+  }
+}
+
+async function saveMember(event) {
+  event.preventDefault();
+  if (!memberForm) {
+    return;
+  }
+
+  const formData = new FormData(memberForm);
+  const selectedExistingId = String(existingMemberSelect?.value || '').trim();
+  const typedName = String(memberNameInput?.value || '').trim();
+  const effectiveMode =
+    memberMode?.value === 'existing' || (selectedExistingId && typedName.length === 0)
+      ? 'existing'
+      : 'new';
+
+  formData.set('mode', effectiveMode);
+  if (effectiveMode === 'existing') {
+    formData.set('member_id', selectedExistingId);
+  } else {
+    formData.delete('member_id');
+  }
+
+  if (effectiveMode === 'existing' && !selectedExistingId) {
+    setStatus('Seleccione un socio o socia para actualizar', 'error');
+    speak('Seleccione un socio o socia para actualizar', 'critical');
+    return;
+  }
+
+  if (effectiveMode === 'new' && !typedName) {
+    const noun = memberNoun(memberGenderSelect?.value);
+    setStatus(`Ingrese nombre del nuevo ${noun}`, 'error');
+    speak(`Ingrese nombre del nuevo ${noun}`, 'critical');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/member/save', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || 'No se pudo guardar socio o socia');
+    }
+
+    state = data.state;
+    selectedMemberId = data.member_id;
+    ensureSelectedMember();
+    hydrateDraftFromState();
+    renderAll();
+    const savedMember = getSelectedMember();
+    const noun = memberNoun(savedMember?.gender || memberGenderSelect?.value);
+    setStatus(`${memberNounCapitalized(savedMember?.gender || memberGenderSelect?.value)} y prestamo guardados`, 'ok');
+    speak(`${noun} y prestamo guardados`);
+
+    if (memberPhotoInput) {
+      memberPhotoInput.value = '';
+    }
+  } catch (error) {
+    setStatus(error.message, 'error');
+    speak(error.message, 'critical');
+  }
+}
+
 memberGrid.addEventListener('click', (event) => {
   const attendanceBtn = event.target.closest('.att-btn');
   if (attendanceBtn) {
@@ -622,10 +927,14 @@ memberGrid.addEventListener('click', (event) => {
   selectedMemberId = Number(card.dataset.memberId);
   hydrateDraftFromState();
   renderAll();
-  setStatus('Socia seleccionada', 'ok');
   const member = getSelectedMember();
   if (member) {
-    speak(`Socia seleccionada: ${member.name}`);
+    const noun = memberNounCapitalized(member.gender);
+    const adjective = selectedAdjective(member.gender);
+    setStatus(`${noun} ${adjective}`, 'ok');
+    speak(`${noun} ${adjective}: ${member.name}`);
+  } else {
+    setStatus('Persona seleccionada', 'ok');
   }
 });
 
@@ -636,6 +945,23 @@ tokenRack.addEventListener('click', (event) => {
   }
   addToDraft(activeJar, Number(token.dataset.value));
 });
+
+function bindAdminTokenRack(rackElement, target) {
+  if (!rackElement) {
+    return;
+  }
+
+  rackElement.addEventListener('click', (event) => {
+    const token = event.target.closest('.money-token');
+    if (!token) {
+      return;
+    }
+    addToLoanInput(target, Number(token.dataset.value));
+  });
+}
+
+bindAdminTokenRack(adminPrincipalTokens, 'principal');
+bindAdminTokenRack(adminInterestTokens, 'interest');
 
 tokenRack.addEventListener('dragstart', (event) => {
   const token = event.target.closest('.money-token');
@@ -712,8 +1038,45 @@ newMeetingBtn.addEventListener('click', startNewMeeting);
 if (resetDemoBtn) {
   resetDemoBtn.addEventListener('click', resetDemoData);
 }
+if (memberMode) {
+  memberMode.addEventListener('change', handleMemberModeChange);
+}
+if (memberGenderSelect) {
+  memberGenderSelect.addEventListener('change', handleMemberModeChange);
+}
+if (existingMemberSelect) {
+  existingMemberSelect.addEventListener('change', () => {
+    if (memberMode) {
+      memberMode.value = 'existing';
+    }
+
+    const member = getMemberById(Number(existingMemberSelect.value));
+    if (!member) {
+      return;
+    }
+
+    if (memberGenderSelect) {
+      memberGenderSelect.value = normalizeGender(member.gender);
+    }
+    if (memberMode?.value === 'existing' && memberNameInput) {
+      memberNameInput.value = member.name;
+    }
+    handleMemberModeChange();
+  });
+}
+if (clearPrincipalBtn) {
+  clearPrincipalBtn.addEventListener('click', () => clearLoanInput('principal'));
+}
+if (clearInterestBtn) {
+  clearInterestBtn.addEventListener('click', () => clearLoanInput('interest'));
+}
+if (memberForm) {
+  memberForm.addEventListener('submit', saveMember);
+}
 
 initTts();
+initNameSpeechToText();
+handleMemberModeChange();
 ensureSelectedMember();
 hydrateDraftFromState();
 renderAll();
