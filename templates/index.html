@@ -20,11 +20,25 @@
         <div class="brand-block">
           <p class="kicker">GAPC</p>
           <h1>Control Visual de Reunion</h1>
-          <p class="subtitle">Asistencia y pago dividido</p>
         </div>
         <div class="meeting-block">
-          <div id="meetingBadge" class="meeting-badge"></div>
-          <button id="newMeetingBtn" class="pill-btn">Nueva reunion</button>
+          <button id="newMeetingBtn" class="pill-btn action-new" type="button">
+            <span class="btn-icon" aria-hidden="true">🔄</span>
+            <span class="btn-label">Nueva Reunion</span>
+          </button>
+          <button id="resetDemoBtn" class="reset-btn action-reset" type="button">
+            <span class="btn-icon" aria-hidden="true">↺</span>
+            <span class="btn-label">Reset Demo</span>
+          </button>
+          <button
+            id="ttsToggleBtn"
+            class="audio-btn"
+            type="button"
+            aria-label="Voz activada"
+            title="Voz activada"
+          >
+            <span class="audio-icon" aria-hidden="true">🔊</span>
+          </button>
         </div>
       </header>
 
@@ -32,7 +46,6 @@
         <article class="members-panel card">
           <div class="section-title-row">
             <h2>Socias</h2>
-            <p class="section-hint">Toque foto y marque asistencia</p>
           </div>
           <div id="memberGrid" class="member-grid"></div>
         </article>
@@ -40,7 +53,6 @@
         <article class="payment-panel card">
           <div class="section-title-row">
             <h2>Pago de Prestamo</h2>
-            <p class="section-hint">Separe principal e interes</p>
           </div>
 
           <div id="selectedMemberInfo" class="selected-member empty">
