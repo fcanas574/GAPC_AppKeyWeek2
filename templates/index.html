@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GAPC - Demo US9 y US10</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;900&family=Baloo+2:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="background-layer"></div>
+
+    <main class="app-shell">
+      <header class="top-bar">
+        <div class="brand-block">
+          <p class="kicker">GAPC</p>
+          <h1>Control Visual de Reunion</h1>
+          <p class="subtitle">Asistencia y pago dividido</p>
+        </div>
+        <div class="meeting-block">
+          <div id="meetingBadge" class="meeting-badge"></div>
+          <button id="newMeetingBtn" class="pill-btn">Nueva reunion</button>
+        </div>
+      </header>
+
+      <section class="layout-grid">
+        <article class="members-panel card">
+          <div class="section-title-row">
+            <h2>Socias</h2>
+            <p class="section-hint">Toque foto y marque asistencia</p>
+          </div>
+          <div id="memberGrid" class="member-grid"></div>
+        </article>
+
+        <article class="payment-panel card">
+          <div class="section-title-row">
+            <h2>Pago de Prestamo</h2>
+            <p class="section-hint">Separe principal e interes</p>
+          </div>
+
+          <div id="selectedMemberInfo" class="selected-member empty">
+            Seleccione una socia
+          </div>
+
+          <div class="wallet-row">
+            <button id="jarPrincipalBtn" class="jar-toggle active" data-target="principal">
+              Alcancia Grande
+            </button>
+            <button id="jarInterestBtn" class="jar-toggle" data-target="interest">
+              Alcancia Pequena
+            </button>
+          </div>
+
+          <div class="jar-grid">
+            <div id="jarPrincipal" class="jar jar-principal" data-target="principal">
+              <p class="jar-icon">🏺</p>
+              <p class="jar-name">Principal</p>
+              <p id="principalAmount" class="jar-amount">$0.00</p>
+              <p id="principalRemaining" class="jar-remaining"></p>
+            </div>
+            <div id="jarInterest" class="jar jar-interest" data-target="interest">
+              <p class="jar-icon">🫙</p>
+              <p class="jar-name">Interes</p>
+              <p id="interestAmount" class="jar-amount">$0.00</p>
+              <p id="interestRemaining" class="jar-remaining"></p>
+            </div>
+          </div>
+
+          <div class="token-zone">
+            <p class="token-label">Fichas de monto</p>
+            <div id="tokenRack" class="token-rack"></div>
+          </div>
+
+          <div class="action-row">
+            <button id="resetDraftBtn" class="danger-btn">X Borrar</button>
+            <button id="savePaymentBtn" class="confirm-btn">Guardar Pago</button>
+          </div>
+          <p id="statusMsg" class="status-msg" aria-live="polite"></p>
+        </article>
+      </section>
+    </main>
+
+    <script id="initialState" type="application/json">
+      {{ state | tojson }}
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
