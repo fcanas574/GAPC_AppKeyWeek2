@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -142,6 +143,12 @@ def init_db() -> None:
 		)
 
 		seed_if_needed(conn)
+
+
+def reset_database() -> None:
+	if DB_PATH.exists():
+		DB_PATH.unlink()
+	init_db()
 
 
 def seed_if_needed(conn: sqlite3.Connection) -> None:
@@ -362,4 +369,16 @@ app = create_app()
 
 
 if __name__ == "__main__":
-	app.run(debug=True, host="localhost", port=8000)
+	parser = argparse.ArgumentParser(description="GAPC Demo")
+	parser.add_argument(
+		"--reset-db",
+		action="store_true",
+		help="Reinicia la base SQLite con datos demo y sale.",
+	)
+	args = parser.parse_args()
+
+	if args.reset_db:
+		reset_database()
+		print(f"Base de datos reiniciada: {DB_PATH}")
+	else:
+		app.run(debug=True, host="localhost", port=8000)
