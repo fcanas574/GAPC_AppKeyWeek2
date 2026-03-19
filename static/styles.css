@@ -406,6 +406,53 @@ h2 {
   font-weight: 700;
 }
 
+.member-wizard-progress {
+  margin: 2px 0 10px;
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: #21563d;
+}
+
+.member-wizard-step {
+  display: none;
+}
+
+.member-wizard-step.active {
+  display: grid;
+}
+
+.member-save-btn.hidden,
+.wizard-nav-btn.hidden {
+  display: none;
+}
+
+.member-final-hint {
+  margin: 0 0 8px;
+  color: #5f4b22;
+  font-weight: 800;
+}
+
+.wizard-nav-row {
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.wizard-nav-btn {
+  min-height: 40px;
+  border: 2px solid #5f5645;
+  border-radius: 10px;
+  background: #f2eee3;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wizard-nav-btn.primary {
+  border-color: #1f5637;
+  background: linear-gradient(180deg, #d9f7e5, #bde9d2);
+}
+
 .member-card {
   border: 2px solid var(--stroke);
   border-radius: 16px;

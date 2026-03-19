@@ -76,9 +76,10 @@
               </button>
             </div>
             <p class="member-admin-step-hint">Sigue los pasos: modo, género, nombre, préstamo e interés.</p>
+            <p id="memberWizardProgress" class="member-wizard-progress">Paso 1 de 5</p>
 
             <form id="memberForm" class="member-form" enctype="multipart/form-data">
-              <div class="member-form-row">
+              <div class="member-form-row member-wizard-step" data-step="1">
                 <label for="memberMode">Modo</label>
                 <select id="memberMode" name="mode">
                   <option value="new">Nuevo socio/a</option>
@@ -86,7 +87,7 @@
                 </select>
               </div>
 
-              <div class="member-form-row">
+              <div class="member-form-row member-wizard-step" data-step="2">
                 <label for="memberGenderSelect">Género</label>
                 <select id="memberGenderSelect" name="gender">
                   <option value="female">Socia</option>
@@ -94,12 +95,12 @@
                 </select>
               </div>
 
-              <div id="existingMemberWrap" class="member-form-row hidden">
+              <div id="existingMemberWrap" class="member-form-row member-wizard-step" data-step="3" data-mode="existing">
                 <label for="existingMemberSelect">Socio/a</label>
                 <select id="existingMemberSelect" name="member_id"></select>
               </div>
 
-              <div class="member-form-row">
+              <div id="newMemberWrap" class="member-form-row member-wizard-step" data-step="3" data-mode="new">
                 <label for="memberNameInput">Nombre</label>
                 <div class="name-input-with-voice">
                   <input id="memberNameInput" name="name" type="text" maxlength="40" />
@@ -115,7 +116,12 @@
                 </div>
               </div>
 
-              <div class="member-form-row two-cols">
+              <div class="member-form-row member-wizard-step" data-step="3">
+                <label for="memberPhotoInput">Foto (opcional)</label>
+                <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
+              </div>
+
+              <div class="member-form-row two-cols member-wizard-step" data-step="4">
                 <div>
                   <label for="principalTotalInput">Préstamo</label>
                   <input
@@ -162,12 +168,15 @@
                 </div>
               </div>
 
-              <div class="member-form-row">
-                <label for="memberPhotoInput">Foto</label>
-                <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
+              <div class="member-form-row member-wizard-step" data-step="5">
+                <p class="member-final-hint">Paso final: revise y guarde.</p>
+                <button type="submit" class="member-save-btn">Guardar Socio/a y Préstamo</button>
               </div>
 
-              <button type="submit" class="member-save-btn">Guardar Socio/a y Préstamo</button>
+              <div class="wizard-nav-row">
+                <button id="memberWizardPrevBtn" class="wizard-nav-btn" type="button">Anterior</button>
+                <button id="memberWizardNextBtn" class="wizard-nav-btn primary" type="button">Siguiente</button>
+              </div>
             </form>
           </section>
         </div>

@@ -18,6 +18,9 @@ const memberAdminModal = document.getElementById('memberAdminModal');
 const memberAdminBackdrop = document.getElementById('memberAdminBackdrop');
 const closeMemberAdminBtn = document.getElementById('closeMemberAdminBtn');
 const memberForm = document.getElementById('memberForm');
+const memberWizardProgress = document.getElementById('memberWizardProgress');
+const memberWizardPrevBtn = document.getElementById('memberWizardPrevBtn');
+const memberWizardNextBtn = document.getElementById('memberWizardNextBtn');
 const memberMode = document.getElementById('memberMode');
 const memberGenderSelect = document.getElementById('memberGenderSelect');
 const existingMemberWrap = document.getElementById('existingMemberWrap');
@@ -31,6 +34,8 @@ const adminInterestTokens = document.getElementById('adminInterestTokens');
 const clearPrincipalBtn = document.getElementById('clearPrincipalBtn');
 const clearInterestBtn = document.getElementById('clearInterestBtn');
 const memberPhotoInput = document.getElementById('memberPhotoInput');
+const memberSaveBtn = document.querySelector('#memberForm .member-save-btn');
+const wizardStepRows = Array.from(document.querySelectorAll('.member-wizard-step'));
 const resetDraftBtn = document.getElementById('resetDraftBtn');
 const savePaymentBtn = document.getElementById('savePaymentBtn');
 const jarPrincipalBtn = document.getElementById('jarPrincipalBtn');
@@ -47,8 +52,16 @@ const speechSupported =
 let ttsEnabled = loadTtsPreference();
 let preferredVoice = null;
 let lastSpeech = { text: '', timestamp: 0 };
-let speechFailureStreak = 0;
+let speechWatchdogId = null;
+let speechLongWatchdogId = null;
 let speechRetryInProgress = false;
+let speechUnlockBound = false;
+let normalSpeechTimeoutId = null;
+let pendingNormalSpeech = '';
+let draftSummaryTimeoutId = null;
+let draftSummaryTarget = 'principal';
+let activeSpeechText = '';
+let lastQueuedSpeech = { text: '', timestamp: 0 };
 const SpeechRecognitionCtor =
   typeof window !== 'undefined'
     ? window.SpeechRecognition || window.webkitSpeechRecognition || null
@@ -58,6 +71,8 @@ let nameRecognizer = null;
 let nameListening = false;
 let nameBaseValue = '';
 let memberWizardLastStep = '';
+let memberWizardCurrentStep = 1;
+const memberWizardTotalSteps = 5;
 
 const coinImageByValue = {
   '0.01': '/static/static/images/coins/1c_c.jpg',
@@ -185,18 +200,61 @@ function pickSpanishVoice() {
   return scored[0]?.voice || spanishVoices[0];
 }
 
+function clearSpeechWatchdogs() {
+  if (speechWatchdogId) {
+    window.clearTimeout(speechWatchdogId);
+    speechWatchdogId = null;
+  }
+  if (speechLongWatchdogId) {
+    window.clearTimeout(speechLongWatchdogId);
+    speechLongWatchdogId = null;
+  }
+}
+
 function touchSpeechEngine() {
   if (!speechSupported) {
     return;
   }
 
   try {
-    // Warm up voice list and unpause engine if the browser left it paused.
     window.speechSynthesis.getVoices();
     window.speechSynthesis.resume();
   } catch (error) {
-    // Ignore transient browser speech errors.
+    // Ignore browser speech transient failures.
   }
+}
+
+function resetSpeechEngine() {
+  if (!speechSupported) {
+    return;
+  }
+
+  try {
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+    window.speechSynthesis.getVoices();
+  } catch (error) {
+    // Ignore browser speech transient failures.
+  }
+}
+
+function estimatedSpeechDurationMs(text) {
+  const safeLength = String(text || '').length;
+  return Math.min(9000, Math.max(2800, safeLength * 95));
+}
+
+function bindSpeechUnlockOnInteraction() {
+  if (!speechSupported || speechUnlockBound) {
+    return;
+  }
+
+  const unlock = () => {
+    touchSpeechEngine();
+  };
+
+  window.addEventListener('pointerdown', unlock, { passive: true });
+  window.addEventListener('keydown', unlock);
+  speechUnlockBound = true;
 }
 
 function buildUtterance(message, voice) {
@@ -206,6 +264,65 @@ function buildUtterance(message, voice) {
   utterance.pitch = 1.08;
   utterance.voice = voice;
   return utterance;
+}
+
+function queueSpeech(message, priority, isRetry = false) {
+  if (!speechSupported || !ttsEnabled) {
+    return;
+  }
+
+  const now = Date.now();
+  if (activeSpeechText === message) {
+    return;
+  }
+  if (lastQueuedSpeech.text === message && now - lastQueuedSpeech.timestamp < 2500) {
+    return;
+  }
+  lastQueuedSpeech = { text: message, timestamp: now };
+
+  touchSpeechEngine();
+  preferredVoice = preferredVoice || pickSpanishVoice();
+  if (!preferredVoice) {
+    updateTtsButton();
+    return;
+  }
+
+  if (priority === 'critical') {
+    try {
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
+      window.speechSynthesis.resume();
+    } catch (error) {
+      // Ignore transient synthesis errors.
+    }
+  }
+
+  const utterance = buildUtterance(message, preferredVoice);
+
+  utterance.onstart = () => {
+    activeSpeechText = message;
+  };
+
+  utterance.onend = () => {
+    if (activeSpeechText === message) {
+      activeSpeechText = '';
+    }
+  };
+
+  utterance.onerror = () => {
+    if (activeSpeechText === message) {
+      activeSpeechText = '';
+    }
+  };
+
+  try {
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    if (activeSpeechText === message) {
+      activeSpeechText = '';
+    }
+  }
 }
 
 function amountToSpeech(value) {
@@ -276,72 +393,94 @@ function speak(message, priority = 'normal') {
     return;
   }
 
-  touchSpeechEngine();
-
   const normalized = String(message).trim();
   if (!normalized) {
     return;
   }
 
   const now = Date.now();
-  if (lastSpeech.text === normalized && now - lastSpeech.timestamp < 900) {
+  if (lastSpeech.text === normalized && now - lastSpeech.timestamp < 2200) {
     return;
   }
 
   lastSpeech = { text: normalized, timestamp: now };
 
   if (priority === 'critical') {
-    window.speechSynthesis.cancel();
-  }
-
-  // Do not speak if no Spanish voice is available; this avoids random English fallback.
-  preferredVoice = preferredVoice || pickSpanishVoice();
-  if (!preferredVoice) {
-    updateTtsButton();
+    if (normalSpeechTimeoutId) {
+      window.clearTimeout(normalSpeechTimeoutId);
+      normalSpeechTimeoutId = null;
+      pendingNormalSpeech = '';
+    }
+    queueSpeech(normalized, priority);
     return;
   }
 
-  const utterance = buildUtterance(normalized, preferredVoice);
-  utterance.onstart = () => {
-    speechFailureStreak = 0;
-    speechRetryInProgress = false;
-  };
-  utterance.onerror = () => {
-    speechFailureStreak += 1;
-    if (speechRetryInProgress || speechFailureStreak > 2 || !ttsEnabled) {
+  // Buffer normal messages to avoid overlap/cut when many UI events fire quickly.
+  pendingNormalSpeech = normalized;
+  if (normalSpeechTimeoutId) {
+    window.clearTimeout(normalSpeechTimeoutId);
+  }
+
+  normalSpeechTimeoutId = window.setTimeout(() => {
+    normalSpeechTimeoutId = null;
+    if (!pendingNormalSpeech || !ttsEnabled) {
       return;
     }
 
-    speechRetryInProgress = true;
-    setTimeout(() => {
-      if (!speechSupported || !ttsEnabled) {
-        speechRetryInProgress = false;
-        return;
-      }
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      // Wait until engine is free, keeping only latest normal message.
+      normalSpeechTimeoutId = window.setTimeout(() => {
+        if (!pendingNormalSpeech || !ttsEnabled) {
+          normalSpeechTimeoutId = null;
+          return;
+        }
+        const messageToSpeak = pendingNormalSpeech;
+        pendingNormalSpeech = '';
+        queueSpeech(messageToSpeak, 'normal');
+        normalSpeechTimeoutId = null;
+      }, 450);
+      return;
+    }
 
-      touchSpeechEngine();
-      preferredVoice = pickSpanishVoice() || preferredVoice;
-      if (!preferredVoice) {
-        speechRetryInProgress = false;
-        updateTtsButton();
-        return;
-      }
+    const messageToSpeak = pendingNormalSpeech;
+    pendingNormalSpeech = '';
+    queueSpeech(messageToSpeak, 'normal');
+  }, 220);
+}
 
-      const retryUtterance = buildUtterance(normalized, preferredVoice);
-      retryUtterance.onstart = () => {
-        speechFailureStreak = 0;
-        speechRetryInProgress = false;
-      };
-      retryUtterance.onerror = () => {
-        speechRetryInProgress = false;
-      };
+function clearDraftSummarySpeech() {
+  if (draftSummaryTimeoutId) {
+    window.clearTimeout(draftSummaryTimeoutId);
+    draftSummaryTimeoutId = null;
+  }
+}
 
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(retryUtterance);
-    }, 120);
-  };
+function scheduleDraftSummarySpeech(target) {
+  draftSummaryTarget = target;
+  clearDraftSummarySpeech();
 
-  window.speechSynthesis.speak(utterance);
+  draftSummaryTimeoutId = window.setTimeout(() => {
+    draftSummaryTimeoutId = null;
+    const member = getSelectedMember();
+    if (!member) {
+      return;
+    }
+
+    const targetLabel = draftSummaryTarget === 'principal' ? 'Principal' : 'Interés';
+    const totalGiven = draftSummaryTarget === 'principal' ? draft.principal : draft.interest;
+    const remaining = getRemainingForTarget(draftSummaryTarget);
+    if (remaining === null) {
+      return;
+    }
+
+    if (remaining <= 0.001) {
+      const paidLabel = draftSummaryTarget === 'principal' ? 'Préstamo pagado' : 'Interés pagado';
+      speak(`${targetLabel}: ${amountToSpeech(totalGiven)}. ${paidLabel}.`);
+      return;
+    }
+
+    speak(`${targetLabel}: ${amountToSpeech(totalGiven)}. Restante: ${amountToSpeech(remaining)}.`);
+  }, 3000);
 }
 
 function initTts() {
@@ -350,9 +489,11 @@ function initTts() {
     return;
   }
 
+  bindSpeechUnlockOnInteraction();
   touchSpeechEngine();
   preferredVoice = pickSpanishVoice();
   updateTtsButton();
+
   window.speechSynthesis.onvoiceschanged = () => {
     touchSpeechEngine();
     preferredVoice = pickSpanishVoice();
@@ -480,6 +621,170 @@ function speakWizardStep(stepKey, message) {
   speak(message, 'critical');
 }
 
+function cleanOptionForSpeech(text) {
+  return String(text || '')
+    .replace(/\//g, ' o ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function narrateSelectStep(stepKey, stepNumber, stepLabel, selectElement) {
+  if (!selectElement || !selectElement.options?.length) {
+    return;
+  }
+
+  const options = Array.from(selectElement.options).map((opt) => cleanOptionForSpeech(opt.textContent));
+  const first = options[0] || '';
+  const second = options[1] || '';
+
+  let message = `Paso ${stepNumber}: ${stepLabel}.`;
+  if (first) {
+    message += ` Primera opción: ${first}.`;
+  }
+  if (second) {
+    message += ` Segunda opción: ${second}.`;
+  }
+  if (options.length > 2) {
+    message += ` Hay ${options.length} opciones en total.`;
+  }
+
+  speakWizardStep(stepKey, message);
+}
+
+function narrateSimpleStep(stepKey, message) {
+  speakWizardStep(stepKey, message);
+}
+
+function getWizardMode() {
+  return memberMode?.value === 'existing' ? 'existing' : 'new';
+}
+
+function isWizardRowVisible(row, mode) {
+  const rowMode = row.dataset.mode;
+  if (!rowMode) {
+    return true;
+  }
+  return rowMode === mode;
+}
+
+function narrateCurrentWizardStep() {
+  const mode = getWizardMode();
+  if (memberWizardCurrentStep === 1) {
+    narrateSelectStep('wizard-step-1', 1, 'seleccione el modo', memberMode);
+    return;
+  }
+  if (memberWizardCurrentStep === 2) {
+    narrateSelectStep('wizard-step-2', 2, 'seleccione el género', memberGenderSelect);
+    return;
+  }
+  if (memberWizardCurrentStep === 3) {
+    if (mode === 'existing') {
+      narrateSelectStep('wizard-step-3-existing', 3, 'elija el socio existente', existingMemberSelect);
+    } else {
+      narrateSimpleStep(
+        'wizard-step-3-new',
+        'Paso 3: escriba nombre y puede añadir foto. Primera opción: teclado. Segunda opción: micrófono.',
+      );
+    }
+    return;
+  }
+  if (memberWizardCurrentStep === 4) {
+    narrateSimpleStep(
+      'wizard-step-4',
+      'Paso 4: registre préstamo e interés. Primera opción: escribir monto. Segunda opción: usar fichas.',
+    );
+    return;
+  }
+
+  narrateSimpleStep('wizard-step-5', 'Paso 5: confirme y guarde.');
+}
+
+function focusWizardStep() {
+  const mode = getWizardMode();
+  const rows = wizardStepRows.filter(
+    (row) => Number(row.dataset.step) === memberWizardCurrentStep && isWizardRowVisible(row, mode),
+  );
+  const focusable = rows
+    .flatMap((row) => Array.from(row.querySelectorAll('select, input, button')))
+    .find((element) => !element.disabled);
+
+  if (focusable) {
+    focusable.focus();
+  }
+}
+
+function renderMemberWizardStep() {
+  const mode = getWizardMode();
+  for (const row of wizardStepRows) {
+    const rowStep = Number(row.dataset.step);
+    const visible = rowStep === memberWizardCurrentStep && isWizardRowVisible(row, mode);
+    row.classList.toggle('active', visible);
+  }
+
+  if (memberWizardProgress) {
+    memberWizardProgress.textContent = `Paso ${memberWizardCurrentStep} de ${memberWizardTotalSteps}`;
+  }
+
+  if (memberWizardPrevBtn) {
+    memberWizardPrevBtn.disabled = memberWizardCurrentStep <= 1;
+  }
+
+  if (memberWizardNextBtn) {
+    memberWizardNextBtn.classList.toggle('hidden', memberWizardCurrentStep >= memberWizardTotalSteps);
+  }
+
+  if (memberSaveBtn) {
+    memberSaveBtn.classList.toggle('hidden', memberWizardCurrentStep !== memberWizardTotalSteps);
+  }
+}
+
+function validateWizardStep(stepNumber) {
+  const mode = getWizardMode();
+  if (stepNumber === 3) {
+    if (mode === 'existing' && !String(existingMemberSelect?.value || '').trim()) {
+      setStatus('Seleccione un socio existente', 'error');
+      speak('Seleccione un socio existente.', 'critical');
+      return false;
+    }
+
+    if (mode === 'new' && !String(memberNameInput?.value || '').trim()) {
+      setStatus('Ingrese nombre del nuevo socio o socia', 'error');
+      speak('Ingrese nombre del nuevo socio o socia.', 'critical');
+      return false;
+    }
+  }
+
+  if (stepNumber === 4) {
+    const principal = Number.parseFloat(principalTotalInput?.value || '0');
+    const interest = Number.parseFloat(interestTotalInput?.value || '0');
+    if (!Number.isFinite(principal) || !Number.isFinite(interest) || principal < 0 || interest < 0) {
+      setStatus('Ingrese préstamo e interés válidos', 'error');
+      speak('Ingrese préstamo e interés válidos.', 'critical');
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function goToWizardStep(stepNumber) {
+  memberWizardCurrentStep = Math.max(1, Math.min(memberWizardTotalSteps, stepNumber));
+  renderMemberWizardStep();
+  narrateCurrentWizardStep();
+  focusWizardStep();
+}
+
+function goToNextWizardStep() {
+  if (!validateWizardStep(memberWizardCurrentStep)) {
+    return;
+  }
+  goToWizardStep(memberWizardCurrentStep + 1);
+}
+
+function goToPrevWizardStep() {
+  goToWizardStep(memberWizardCurrentStep - 1);
+}
+
 function openMemberAdminModal() {
   if (!memberAdminModal) {
     return;
@@ -488,10 +793,7 @@ function openMemberAdminModal() {
   memberAdminModal.classList.remove('hidden');
   memberAdminModal.setAttribute('aria-hidden', 'false');
   memberWizardLastStep = '';
-  speakWizardStep(
-    'open',
-    'Añadir nuevo miembro. Paso 1: seleccione el modo, nuevo socio o socio existente.',
-  );
+  goToWizardStep(1);
 }
 
 function closeMemberAdminModal() {
@@ -502,6 +804,7 @@ function closeMemberAdminModal() {
   memberAdminModal.classList.add('hidden');
   memberAdminModal.setAttribute('aria-hidden', 'true');
   memberWizardLastStep = '';
+  memberWizardCurrentStep = 1;
 }
 
 function announceMemberWizardStep() {
@@ -510,16 +813,20 @@ function announceMemberWizardStep() {
   const noun = memberNoun(gender);
 
   if (mode === 'new') {
-    speakWizardStep(
-      `step-new-${gender}`,
-      `Paso 2: género ${noun}. Paso 3: escriba el nombre del nuevo ${noun}.`,
+    narrateSelectStep(`step-gender-${gender}`, 2, 'seleccione el género del socio', memberGenderSelect);
+    narrateSimpleStep(
+      `step-new-name-${gender}`,
+      `Paso 3: escriba el nombre del nuevo ${noun}. Primera opción: escribir en teclado. Segunda opción: dictar con micrófono.`,
     );
     return;
   }
 
-  speakWizardStep(
-    `step-existing-${gender}`,
-    `Paso 2: elija el ${noun} existente. Paso 3: ajuste préstamo e interés.`,
+  narrateSelectStep(`step-gender-existing-${gender}`, 2, 'seleccione el género del socio', memberGenderSelect);
+  narrateSelectStep(
+    `step-existing-pick-${gender}`,
+    3,
+    `elija el ${noun} existente`,
+    existingMemberSelect,
   );
 }
 
@@ -821,6 +1128,15 @@ function speakRemainingForTarget(target) {
   }
 
   const targetLabel = target === 'principal' ? 'principal' : 'interés';
+  if (remaining <= 0.001) {
+    if (target === 'principal') {
+      speak('Préstamo pagado.');
+    } else {
+      speak('Interés pagado.');
+    }
+    return;
+  }
+
   if (remaining >= 0) {
     speak(`En ${targetLabel}, falta ${amountToSpeech(remaining)}`);
   } else {
@@ -845,8 +1161,7 @@ function addToDraft(target, value) {
     draft.interest = +(draft.interest + value).toFixed(2);
   }
   setStatus('Monto agregado', 'ok');
-  const targetLabel = target === 'principal' ? 'principal' : 'interés';
-  speak(`Agregado ${amountToSpeech(value)} a ${targetLabel}`);
+  scheduleDraftSummarySpeech(target);
   renderSelectedMemberPanel();
 }
 
@@ -910,16 +1225,50 @@ async function savePayment() {
     renderAll();
 
     const summary = data.payment_summary;
-    const totalChange = summary?.change?.total || 0;
-    if (totalChange > 0) {
-      setStatus(`Pago guardado. Debe dar vuelto: ${money(totalChange)}`, 'ok');
-      speak(`Pago guardado. Debe dar vuelto de ${amountToSpeech(totalChange)}.`);
+    const changePrincipal = Number(summary?.change?.principal || 0);
+    const changeInterest = Number(summary?.change?.interest || 0);
+    const totalChange = Number(summary?.change?.total || changePrincipal + changeInterest || 0);
+    const hasChange = changePrincipal > 0.001 || changeInterest > 0.001 || totalChange > 0.001;
+    const selected = getSelectedMember();
+    const principalPaid = Boolean(selected) && selected.loan.principal_remaining <= 0.001;
+    const interestPaid = Boolean(selected) && selected.loan.interest_remaining <= 0.001;
+
+    const paidParts = [];
+    if (principalPaid) {
+      paidParts.push('préstamo principal pagado');
+    }
+    if (interestPaid) {
+      paidParts.push('interés pagado');
+    }
+
+    const paidSummary = paidParts.join(' y ');
+
+    if (hasChange) {
+      const changeValue = totalChange > 0.001 ? totalChange : changePrincipal + changeInterest;
+      if (paidSummary) {
+        setStatus(`${paidSummary.charAt(0).toUpperCase()}${paidSummary.slice(1)}, vuelto ${money(changeValue)}`, 'ok');
+        speak(`${paidSummary}, vuelto ${money(changeValue)}.`, 'critical');
+      } else {
+        setStatus(`Pago guardado, vuelto ${money(changeValue)}`, 'ok');
+        speak(`Pago guardado, vuelto ${money(changeValue)}.`, 'critical');
+      }
     } else {
       setStatus('Pago guardado', 'ok');
-      speak(
-        `Pago guardado. Principal ${amountToSpeech(paidPrincipal)}. Interés ${amountToSpeech(paidInterest)}.`,
-      );
+      if (paidSummary) {
+        speak(`Pago guardado. ${paidSummary}.`);
+      } else {
+        const parts = [];
+        if (paidPrincipal > 0) {
+          parts.push(`Principal ${amountToSpeech(paidPrincipal)}`);
+        }
+        if (paidInterest > 0) {
+          parts.push(`Interés ${amountToSpeech(paidInterest)}`);
+        }
+        speak(parts.length ? `Pago guardado. ${parts.join('. ')}.` : 'Pago guardado.');
+      }
     }
+
+    clearDraftSummarySpeech();
   } catch (error) {
     setStatus(error.message, 'error');
     speak(error.message, 'critical');
@@ -979,12 +1328,17 @@ function handleMemberModeChange() {
     }
   }
 
-  announceMemberWizardStep();
+  renderMemberWizardStep();
 }
 
 async function saveMember(event) {
   event.preventDefault();
   if (!memberForm) {
+    return;
+  }
+
+  if (memberWizardCurrentStep < memberWizardTotalSteps) {
+    goToNextWizardStep();
     return;
   }
 
@@ -1036,6 +1390,7 @@ async function saveMember(event) {
     setStatus(`${memberNounCapitalized(savedMember?.gender || memberGenderSelect?.value)} y préstamo guardados`, 'ok');
     speak(`${noun} y préstamo guardados`);
     closeMemberAdminModal();
+    renderMemberWizardStep();
 
     if (memberPhotoInput) {
       memberPhotoInput.value = '';
@@ -1061,6 +1416,7 @@ memberGrid.addEventListener('click', (event) => {
   }
 
   selectedMemberId = Number(card.dataset.memberId);
+  clearDraftSummarySpeech();
   hydrateDraftFromState();
   renderAll();
   const member = getSelectedMember();
@@ -1151,6 +1507,7 @@ jarInterestBtn.addEventListener('click', () => {
 
 resetDraftBtn.addEventListener('click', () => {
   draft = { principal: 0, interest: 0 };
+  clearDraftSummarySpeech();
   renderSelectedMemberPanel();
   setStatus('Borrador limpio', 'ok');
   speak('Borrador limpio');
@@ -1180,9 +1537,6 @@ if (resetDemoBtn) {
 if (openMemberAdminBtn) {
   openMemberAdminBtn.addEventListener('click', () => {
     openMemberAdminModal();
-    if (memberMode) {
-      memberMode.focus();
-    }
   });
 }
 if (closeMemberAdminBtn) {
@@ -1199,21 +1553,13 @@ window.addEventListener('keydown', (event) => {
 if (memberMode) {
   memberMode.addEventListener('change', () => {
     handleMemberModeChange();
-    const label = memberMode.value === 'existing' ? 'socio existente' : 'nuevo socio';
-    speak(`Modo seleccionado: ${label}.`, 'critical');
-  });
-  memberMode.addEventListener('focus', () => {
-    speakWizardStep('focus-mode', 'Paso 1: seleccione el modo de registro.');
+    narrateCurrentWizardStep();
   });
 }
 if (memberGenderSelect) {
   memberGenderSelect.addEventListener('change', () => {
     handleMemberModeChange();
-    const noun = memberNoun(memberGenderSelect.value);
-    speak(`Paso 2: género seleccionado, ${noun}.`, 'critical');
-  });
-  memberGenderSelect.addEventListener('focus', () => {
-    speakWizardStep('focus-gender', 'Paso 2: seleccione el género del socio.');
+    narrateCurrentWizardStep();
   });
 }
 if (existingMemberSelect) {
@@ -1236,9 +1582,6 @@ if (existingMemberSelect) {
     handleMemberModeChange();
     speak(`Socio seleccionado: ${member.name}.`, 'critical');
   });
-  existingMemberSelect.addEventListener('focus', () => {
-    speakWizardStep('focus-existing', 'Paso 3: elija el socio existente que desea actualizar.');
-  });
 }
 if (clearPrincipalBtn) {
   clearPrincipalBtn.addEventListener('click', () => {
@@ -1255,35 +1598,24 @@ if (clearInterestBtn) {
 if (memberForm) {
   memberForm.addEventListener('submit', saveMember);
 }
-if (memberNameInput) {
-  memberNameInput.addEventListener('focus', () => {
-    speakWizardStep('focus-name', 'Paso 3: escriba el nombre del socio.');
-  });
-}
-if (principalTotalInput) {
-  principalTotalInput.addEventListener('focus', () => {
-    speakWizardStep('focus-principal', 'Paso 4: indique el monto del préstamo.');
-  });
-}
-if (interestTotalInput) {
-  interestTotalInput.addEventListener('focus', () => {
-    speakWizardStep('focus-interest', 'Paso 5: indique el monto del interés.');
-  });
-}
 if (memberPhotoInput) {
-  memberPhotoInput.addEventListener('focus', () => {
-    speakWizardStep('focus-photo', 'Paso 6: puede añadir una foto opcional.');
-  });
   memberPhotoInput.addEventListener('change', () => {
     if (memberPhotoInput.files && memberPhotoInput.files.length) {
       speak('Foto añadida.', 'critical');
     }
   });
 }
+if (memberWizardPrevBtn) {
+  memberWizardPrevBtn.addEventListener('click', goToPrevWizardStep);
+}
+if (memberWizardNextBtn) {
+  memberWizardNextBtn.addEventListener('click', goToNextWizardStep);
+}
 
 initTts();
 initNameSpeechToText();
 handleMemberModeChange();
+renderMemberWizardStep();
 ensureSelectedMember();
 hydrateDraftFromState();
 renderAll();
