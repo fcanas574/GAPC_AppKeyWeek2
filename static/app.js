@@ -45,6 +45,8 @@ const jars = document.querySelectorAll('.jar');
 let selectedMemberId = null;
 let activeJar = 'principal';
 let draft = { principal: 0, interest: 0 };
+const paymentDraftByMemberId = new Map();
+let paymentSaveInFlight = false;
 const speechSupported =
   typeof window !== 'undefined' &&
   'speechSynthesis' in window &&
@@ -858,8 +860,7 @@ function ensureSelectedMember() {
   }
 
   const selectedExists = state.members.some((member) => member.id === selectedMemberId);
-  const current = getSelectedMember();
-  if (!selectedExists || !current || !memberHasPending(current)) {
+  if (!selectedExists) {
     selectedMemberId = pickBestMemberId();
   }
 }
@@ -868,12 +869,40 @@ function getMemberById(memberId) {
   return state.members.find((member) => member.id === memberId) || null;
 }
 
+function saveDraftForMember(memberId) {
+  if (!Number.isInteger(memberId)) {
+    return;
+  }
+
+  paymentDraftByMemberId.set(memberId, {
+    principal: Number(draft.principal || 0),
+    interest: Number(draft.interest || 0),
+  });
+}
+
+function clearDraftForMember(memberId) {
+  if (!Number.isInteger(memberId)) {
+    return;
+  }
+  paymentDraftByMemberId.delete(memberId);
+}
+
 function hydrateDraftFromState() {
   const member = getSelectedMember();
   if (!member) {
     draft = { principal: 0, interest: 0 };
     return;
   }
+
+  const savedDraft = paymentDraftByMemberId.get(member.id);
+  if (savedDraft) {
+    draft = {
+      principal: Number(savedDraft.principal || 0),
+      interest: Number(savedDraft.interest || 0),
+    };
+    return;
+  }
+
   draft = {
     principal: member.loan.current_payment.principal,
     interest: member.loan.current_payment.interest,
@@ -1160,6 +1189,7 @@ function addToDraft(target, value) {
   } else {
     draft.interest = +(draft.interest + value).toFixed(2);
   }
+  saveDraftForMember(selectedMemberId);
   setStatus('Monto agregado', 'ok');
   scheduleDraftSummarySpeech(target);
   renderSelectedMemberPanel();
@@ -1198,6 +1228,10 @@ async function updateAttendance(memberId, status) {
 }
 
 async function savePayment() {
+  if (paymentSaveInFlight) {
+    return;
+  }
+
   if (!selectedMemberId) {
     setStatus('Seleccione un socio o socia', 'error');
     speak('Seleccione un socio o socia', 'critical');
@@ -1212,10 +1246,13 @@ async function savePayment() {
 
   const paidPrincipal = draft.principal;
   const paidInterest = draft.interest;
+  const memberIdToSave = selectedMemberId;
+  saveDraftForMember(memberIdToSave);
 
   try {
+    paymentSaveInFlight = true;
     const data = await postJson('/api/payment', {
-      member_id: selectedMemberId,
+      member_id: memberIdToSave,
       principal: draft.principal,
       interest: draft.interest,
     });
@@ -1269,9 +1306,12 @@ async function savePayment() {
     }
 
     clearDraftSummarySpeech();
+    clearDraftForMember(memberIdToSave);
   } catch (error) {
     setStatus(error.message, 'error');
     speak(error.message, 'critical');
+  } finally {
+    paymentSaveInFlight = false;
   }
 }
 
@@ -1279,6 +1319,7 @@ async function startNewMeeting() {
   try {
     const data = await postJson('/api/meeting/new', {});
     state = data.state;
+    paymentDraftByMemberId.clear();
     ensureSelectedMember();
     hydrateDraftFromState();
     renderAll();
@@ -1294,6 +1335,7 @@ async function resetDemoData() {
   try {
     const data = await postJson('/api/demo/reset', {});
     state = data.state;
+    paymentDraftByMemberId.clear();
     ensureSelectedMember();
     hydrateDraftFromState();
     renderAll();
@@ -1402,6 +1444,11 @@ async function saveMember(event) {
 }
 
 memberGrid.addEventListener('click', (event) => {
+  if (paymentSaveInFlight) {
+    setStatus('Guardando pago, espere un momento', 'ok');
+    return;
+  }
+
   const attendanceBtn = event.target.closest('.att-btn');
   if (attendanceBtn) {
     const memberId = Number(attendanceBtn.dataset.memberId);
@@ -1413,6 +1460,10 @@ memberGrid.addEventListener('click', (event) => {
   const card = event.target.closest('.member-card');
   if (!card) {
     return;
+  }
+
+  if (Number.isInteger(selectedMemberId)) {
+    saveDraftForMember(selectedMemberId);
   }
 
   selectedMemberId = Number(card.dataset.memberId);
@@ -1507,6 +1558,7 @@ jarInterestBtn.addEventListener('click', () => {
 
 resetDraftBtn.addEventListener('click', () => {
   draft = { principal: 0, interest: 0 };
+  clearDraftForMember(selectedMemberId);
   clearDraftSummarySpeech();
   renderSelectedMemberPanel();
   setStatus('Borrador limpio', 'ok');
