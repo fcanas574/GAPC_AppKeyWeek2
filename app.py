@@ -243,6 +243,7 @@ def init_db() -> None:
 				member_id INTEGER PRIMARY KEY,
 				principal_total REAL NOT NULL,
 				interest_total REAL NOT NULL,
+				interest_per_meeting REAL NOT NULL,
 				FOREIGN KEY (member_id) REFERENCES members(id)
 			);
 
@@ -289,6 +290,17 @@ def ensure_schema_migrations(conn: sqlite3.Connection) -> None:
 		conn.execute("ALTER TABLE members ADD COLUMN photo_path TEXT")
 	if "gender" not in column_names:
 		conn.execute("ALTER TABLE members ADD COLUMN gender TEXT NOT NULL DEFAULT 'female'")
+
+	loan_columns = conn.execute("PRAGMA table_info(loans)").fetchall()
+	loan_column_names = {column["name"] for column in loan_columns}
+	if "interest_per_meeting" not in loan_column_names:
+		conn.execute("ALTER TABLE loans ADD COLUMN interest_per_meeting REAL")
+		conn.execute(
+			"UPDATE loans SET interest_per_meeting = interest_total WHERE interest_per_meeting IS NULL"
+		)
+		conn.execute(
+			"UPDATE loans SET interest_per_meeting = 0 WHERE interest_per_meeting IS NULL"
+		)
 
 
 def normalize_gender(gender: str | None) -> str:
@@ -355,14 +367,15 @@ def create_or_update_member(
 				)
 				conn.execute(
 					"""
-					INSERT INTO loans(member_id, principal_total, interest_total)
-					VALUES (?, ?, ?)
+					INSERT INTO loans(member_id, principal_total, interest_total, interest_per_meeting)
+					VALUES (?, ?, ?, ?)
 					ON CONFLICT(member_id)
 					DO UPDATE SET
 						principal_total = excluded.principal_total,
-						interest_total = excluded.interest_total
+						interest_total = excluded.interest_total,
+						interest_per_meeting = excluded.interest_per_meeting
 					""",
-					(existing_id, principal_total, interest_total),
+					(existing_id, principal_total, interest_total, interest_total),
 				)
 				return existing_id
 
@@ -373,8 +386,8 @@ def create_or_update_member(
 			)
 			new_member_id = int(cursor.lastrowid)
 			conn.execute(
-				"INSERT INTO loans(member_id, principal_total, interest_total) VALUES (?, ?, ?)",
-				(new_member_id, principal_total, interest_total),
+				"INSERT INTO loans(member_id, principal_total, interest_total, interest_per_meeting) VALUES (?, ?, ?, ?)",
+				(new_member_id, principal_total, interest_total, interest_total),
 			)
 			return new_member_id
 
@@ -398,14 +411,15 @@ def create_or_update_member(
 		)
 		conn.execute(
 			"""
-			INSERT INTO loans(member_id, principal_total, interest_total)
-			VALUES (?, ?, ?)
+			INSERT INTO loans(member_id, principal_total, interest_total, interest_per_meeting)
+			VALUES (?, ?, ?, ?)
 			ON CONFLICT(member_id)
 			DO UPDATE SET
 				principal_total = excluded.principal_total,
-				interest_total = excluded.interest_total
+				interest_total = excluded.interest_total,
+				interest_per_meeting = excluded.interest_per_meeting
 			""",
-			(member_id, principal_total, interest_total),
+			(member_id, principal_total, interest_total, interest_total),
 		)
 		return member_id
 
@@ -457,14 +471,15 @@ def update_member_attributes(
 		)
 		conn.execute(
 			"""
-			INSERT INTO loans(member_id, principal_total, interest_total)
-			VALUES (?, ?, ?)
+			INSERT INTO loans(member_id, principal_total, interest_total, interest_per_meeting)
+			VALUES (?, ?, ?, ?)
 			ON CONFLICT(member_id)
 			DO UPDATE SET
 				principal_total = excluded.principal_total,
-				interest_total = excluded.interest_total
+				interest_total = excluded.interest_total,
+				interest_per_meeting = excluded.interest_per_meeting
 			""",
-			(member_id, principal_total, interest_total),
+			(member_id, principal_total, interest_total, interest_total),
 		)
 
 
@@ -496,10 +511,10 @@ def seed_if_needed(conn: sqlite3.Connection) -> None:
 	for idx, member in enumerate(rows, start=1):
 		principal_total = round(1.0 + (idx * 0.4), 2)
 		interest_total = round(0.10 + (idx % 3) * 0.05, 2)
-		demo_loans.append((member["id"], principal_total, interest_total))
+		demo_loans.append((member["id"], principal_total, interest_total, interest_total))
 
 	conn.executemany(
-		"INSERT INTO loans(member_id, principal_total, interest_total) VALUES (?, ?, ?)",
+		"INSERT INTO loans(member_id, principal_total, interest_total, interest_per_meeting) VALUES (?, ?, ?, ?)",
 		demo_loans,
 	)
 
@@ -529,12 +544,27 @@ def get_active_meeting_id() -> int:
 def start_new_meeting() -> int:
 	now = utc_now_iso()
 	with get_connection() as conn:
+		accrue_interest_for_open_principal(conn)
 		conn.execute("UPDATE meetings SET is_active = 0 WHERE is_active = 1")
 		cursor = conn.execute(
 			"INSERT INTO meetings(started_at, is_active) VALUES (?, 1)",
 			(now,),
 		)
 		return int(cursor.lastrowid)
+
+
+def accrue_interest_for_open_principal(conn: sqlite3.Connection) -> None:
+	conn.execute(
+		"""
+		UPDATE loans
+		SET interest_total = ROUND(interest_total + interest_per_meeting, 2)
+		WHERE interest_per_meeting > 0
+			AND (
+				principal_total
+				- COALESCE((SELECT SUM(p.principal) FROM payments p WHERE p.member_id = loans.member_id), 0)
+			) > 0.0001
+		"""
+	)
 
 
 def upsert_attendance(meeting_id: int, member_id: int, status: str) -> None:
@@ -633,6 +663,7 @@ def get_state() -> dict[str, Any]:
 				m.gender,
 				l.principal_total,
 				l.interest_total,
+				l.interest_per_meeting,
 				COALESCE(a.status, 'absent') AS attendance,
 				COALESCE(pm.principal, 0) AS current_principal,
 				COALESCE(pm.interest, 0) AS current_interest,
@@ -675,7 +706,7 @@ def get_state() -> dict[str, Any]:
 				"attendance": row["attendance"],
 				"loan": {
 					"principal_total": round(row["principal_total"], 2),
-					"interest_total": round(row["interest_total"], 2),
+					"interest_total": round(row["interest_per_meeting"], 2),
 					"principal_remaining": principal_remaining,
 					"interest_remaining": interest_remaining,
 					"current_payment": {
