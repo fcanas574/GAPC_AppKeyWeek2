@@ -738,7 +738,7 @@ app = create_app()
 
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description="GAPC Demo")
+	parser = argparse.ArgumentParser(description="MisChirilicas")
 	parser.add_argument(
 		"--reset-db",
 		action="store_true",

@@ -67,8 +67,6 @@ const memberSaveBtn = document.querySelector('#memberForm .member-save-btn');
 const wizardStepRows = Array.from(document.querySelectorAll('.member-wizard-step'));
 const resetDraftBtn = document.getElementById('resetDraftBtn');
 const savePaymentBtn = document.getElementById('savePaymentBtn');
-const jarPrincipalBtn = document.getElementById('jarPrincipalBtn');
-const jarInterestBtn = document.getElementById('jarInterestBtn');
 const jars = document.querySelectorAll('.jar');
 
 let selectedMemberId = null;
@@ -1636,8 +1634,9 @@ function renderAdminLoanTokens() {
 }
 
 function renderJarSelection() {
-  jarPrincipalBtn.classList.toggle('active', activeJar === 'principal');
-  jarInterestBtn.classList.toggle('active', activeJar === 'interest');
+  jars.forEach((jar) => {
+    jar.classList.toggle('active', jar.dataset.target === activeJar);
+  });
 }
 
 function renderAll() {
@@ -2251,18 +2250,6 @@ jars.forEach((jar) => {
     }
     addToDraft(jar.dataset.target, value);
   });
-});
-
-jarPrincipalBtn.addEventListener('click', () => {
-  activeJar = 'principal';
-  renderJarSelection();
-  speakRemainingForTarget(activeJar);
-});
-
-jarInterestBtn.addEventListener('click', () => {
-  activeJar = 'interest';
-  renderJarSelection();
-  speakRemainingForTarget(activeJar);
 });
 
 resetDraftBtn.addEventListener('click', () => {

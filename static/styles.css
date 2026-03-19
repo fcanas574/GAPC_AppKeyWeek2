@@ -50,10 +50,11 @@ body {
 
 .kicker {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--muted);
+  font-weight: 900;
 }
 
 h1 {
@@ -428,6 +429,13 @@ h2 {
   gap: 8px;
 }
 
+.inline-camera-actions .photo-action-btn {
+  min-height: 46px;
+  grid-template-rows: none;
+  gap: 0;
+  padding: 6px 10px;
+}
+
 .photo-file-label {
   margin: 0;
   font-size: 0.8rem;
@@ -473,6 +481,13 @@ h2 {
   background: #ececec;
   color: #777;
   cursor: not-allowed;
+}
+
+#nameVoiceBtn {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  font-size: 1.5rem;
 }
 
 .member-save-btn {
@@ -584,11 +599,13 @@ h2 {
 }
 
 .wizard-nav-btn {
-  min-height: 40px;
+  min-height: 48px;
   border: 2px solid #5f5645;
   border-radius: 10px;
   background: #f2eee3;
   font-weight: 800;
+  font-size: 1.08rem;
+  letter-spacing: 0.01em;
   cursor: pointer;
 }
 
@@ -738,43 +755,31 @@ h2 {
   font-weight: 900;
 }
 
-.wallet-row {
-  margin-top: 12px;
+.jar-grid {
+  margin-top: 14px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 
-.jar-toggle {
-  border: 2px solid #46403c;
-  border-radius: 14px;
-  min-height: 56px;
-  font-weight: 800;
-  font-size: 1.02rem;
-  background: linear-gradient(180deg, #ffffff, #f3ede2);
-  cursor: pointer;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
-}
-
-.jar-toggle.active {
-  border-color: #8c6a24;
-  background: linear-gradient(180deg, #ffe9af, #f7d983);
-}
-
-.jar-grid {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
 .jar {
   border: 2px solid var(--stroke);
   border-radius: 14px;
-  padding: 10px;
+  padding: 12px;
   text-align: center;
-  min-height: 180px;
+  min-height: 220px;
   background: #fff;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.jar:hover {
+  transform: translateY(-1px);
+}
+
+.jar.active {
+  border-color: #8c6a24;
+  box-shadow: 0 0 0 4px rgba(229, 168, 35, 0.28), 0 8px 16px rgba(0, 0, 0, 0.12);
 }
 
 .jar.drag-over {
@@ -790,8 +795,8 @@ h2 {
 }
 
 .jar-icon {
-  margin: 4px 0;
-  font-size: 4rem;
+  margin: 6px 0;
+  font-size: 4.4rem;
 }
 
 .jar-name {
@@ -800,8 +805,8 @@ h2 {
 }
 
 .jar-amount {
-  margin: 6px 0 2px;
-  font-size: 1.4rem;
+  margin: 8px 0 3px;
+  font-size: 2rem;
   font-weight: 900;
 }
 
@@ -1106,6 +1111,12 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  #nameVoiceBtn {
+    width: 56px;
+    height: 56px;
+    font-size: 1.65rem;
+  }
+
   .photo-action-btn {
     min-height: 92px;
   }
@@ -1147,7 +1158,6 @@ h2 {
     height: 88px;
   }
 
-  .wallet-row,
   .jar-grid,
   .action-row,
   .member-settings-actions {
@@ -1155,15 +1165,15 @@ h2 {
   }
 
   .jar {
-    min-height: 148px;
+    min-height: 178px;
   }
 
   .jar-icon {
-    font-size: 3rem;
+    font-size: 3.2rem;
   }
 
   .jar-amount {
-    font-size: 1.22rem;
+    font-size: 1.6rem;
   }
 
   .token-rack {
@@ -1200,6 +1210,11 @@ h2 {
 
   .wizard-nav-row {
     grid-template-columns: 1fr;
+  }
+
+  .wizard-nav-btn {
+    min-height: 52px;
+    font-size: 1.12rem;
   }
 
   .admin-token-rack,

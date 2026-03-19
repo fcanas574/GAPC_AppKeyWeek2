@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GAPC - Demo US9 y US10</title>
+    <title>MisChirilicas</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -18,8 +18,8 @@
     <main class="app-shell">
       <header class="top-bar">
         <div class="brand-block">
-          <p class="kicker">GAPC</p>
-          <h1>Control Visual de Reunión</h1>
+          <p class="kicker">MisChirilicas</p>
+          <h1>🪙 Control Visual de Reunión</h1>
         </div>
         <div class="meeting-block">
           <button id="newMeetingBtn" class="pill-btn action-new" type="button">
@@ -45,7 +45,7 @@
       <section class="layout-grid">
         <article class="members-panel card">
           <div class="section-title-row">
-            <h2>Socios y Socias</h2>
+            <h2>👥 Socios y Socias</h2>
             <button
               id="openMemberAdminBtn"
               class="open-member-admin-btn"
@@ -64,7 +64,7 @@
           <div id="memberAdminBackdrop" class="member-admin-backdrop"></div>
           <section class="member-admin-dialog" role="dialog" aria-modal="true" aria-labelledby="memberAdminTitle">
             <div class="member-admin-header">
-              <h3 id="memberAdminTitle">Añadir Socios y Préstamos</h3>
+              <h3 id="memberAdminTitle">➕ Añadir Socios y Préstamos</h3>
               <button
                 id="closeMemberAdminBtn"
                 class="close-member-admin-btn"
@@ -80,15 +80,15 @@
 
             <form id="memberForm" class="member-form" enctype="multipart/form-data">
               <div class="member-form-row member-wizard-step" data-step="1">
-                <label for="memberGenderSelect">Género</label>
+                <label for="memberGenderSelect">🧑 Género</label>
                 <select id="memberGenderSelect" name="gender">
-                  <option value="female">Socia</option>
-                  <option value="male">Socio</option>
+                  <option value="female">Socia 👩</option>
+                  <option value="male">Socio 👨</option>
                 </select>
               </div>
 
               <div id="newMemberWrap" class="member-form-row member-wizard-step" data-step="2">
-                <label for="memberNameInput">Nombre</label>
+                <label for="memberNameInput">📝 Nombre</label>
                 <div class="name-input-with-voice">
                   <input id="memberNameInput" name="name" type="text" maxlength="40" />
                   <button
@@ -104,7 +104,7 @@
               </div>
 
               <div class="member-form-row member-wizard-step" data-step="2">
-                <label for="memberPhotoInput">Foto (opcional)</label>
+                <label for="memberPhotoInput">📸 Foto (opcional)</label>
                 <div class="photo-picker-actions">
                   <label class="photo-action-btn file-trigger">
                     <span class="photo-action-icon" aria-hidden="true">🖼️</span>
@@ -137,7 +137,7 @@
 
               <div class="member-form-row two-cols member-wizard-step" data-step="3">
                 <div>
-                  <label for="principalTotalInput">Préstamo</label>
+                  <label for="principalTotalInput">💰 Préstamo</label>
                   <input
                     id="principalTotalInput"
                     name="principal_total"
@@ -159,7 +159,7 @@
                   </div>
                 </div>
                 <div>
-                  <label for="interestTotalInput">Interés por reunión</label>
+                  <label for="interestTotalInput">📈 Interés por reunión</label>
                   <input
                     id="interestTotalInput"
                     name="interest_total"
@@ -183,13 +183,13 @@
               </div>
 
               <div class="member-form-row member-wizard-step" data-step="4">
-                <p class="member-final-hint">Paso final: revise y guarde.</p>
-                <button type="submit" class="member-save-btn">Guardar Socio/a y Préstamo</button>
+                <p class="member-final-hint">✅ Paso final: revise y guarde.</p>
+                <button type="submit" class="member-save-btn">💾 Guardar Socio/a y Préstamo</button>
               </div>
 
               <div class="wizard-nav-row">
-                <button id="memberWizardPrevBtn" class="wizard-nav-btn" type="button">← Anterior</button>
-                <button id="memberWizardNextBtn" class="wizard-nav-btn primary" type="button">Siguiente →</button>
+                <button id="memberWizardPrevBtn" class="wizard-nav-btn" type="button">⬅️ Anterior</button>
+                <button id="memberWizardNextBtn" class="wizard-nav-btn primary" type="button">Siguiente ➡️</button>
               </div>
             </form>
           </section>
@@ -199,7 +199,7 @@
           <div id="memberSettingsBackdrop" class="member-admin-backdrop"></div>
           <section class="member-admin-dialog member-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="memberSettingsTitle">
             <div class="member-admin-header">
-              <h3 id="memberSettingsTitle">Configuración del Socio/a</h3>
+              <h3 id="memberSettingsTitle">⚙ Configuración del Socio/a</h3>
               <button
                 id="closeMemberSettingsBtn"
                 class="close-member-admin-btn"
@@ -215,7 +215,7 @@
               <input id="settingsMemberId" type="hidden" />
 
               <div class="member-form-row">
-                <label for="settingsMemberName">Nombre</label>
+                <label for="settingsMemberName">1. 📝 Nombre</label>
                 <div class="name-input-with-voice">
                   <input id="settingsMemberName" type="text" maxlength="40" required />
                   <button
@@ -231,7 +231,7 @@
               </div>
 
               <div class="member-form-row">
-                <label for="settingsMemberGender">Género</label>
+                <label for="settingsMemberGender">2. 🧑 Género</label>
                 <select id="settingsMemberGender" required>
                   <option value="female">Socia</option>
                   <option value="male">Socio</option>
@@ -240,7 +240,7 @@
 
               <div class="member-form-row two-cols">
                 <div>
-                  <label for="settingsPrincipalTotal">Préstamo principal</label>
+                  <label for="settingsPrincipalTotal">3. 💰 Préstamo principal</label>
                   <input id="settingsPrincipalTotal" type="number" min="0" step="0.01" required />
                   <div class="loan-picker-block">
                     <div id="settingsPrincipalTokens" class="admin-token-rack" data-target="principal"></div>
@@ -255,7 +255,7 @@
                   </div>
                 </div>
                 <div>
-                  <label for="settingsInterestTotal">Interés por reunión</label>
+                  <label for="settingsInterestTotal">4. 📈 Interés por reunión</label>
                   <input id="settingsInterestTotal" type="number" min="0" step="0.01" required />
                   <div class="loan-picker-block">
                     <div id="settingsInterestTokens" class="admin-token-rack" data-target="interest"></div>
@@ -272,8 +272,8 @@
               </div>
 
               <div class="member-settings-actions">
-                <button id="deleteMemberSettingsBtn" class="danger-btn" type="button">Eliminar socio/a</button>
-                <button class="confirm-btn" type="submit">Guardar cambios</button>
+                <button id="deleteMemberSettingsBtn" class="danger-btn" type="button">5. 🗑 Eliminar socio/a</button>
+                <button class="confirm-btn" type="submit">6. 💾 Guardar cambios</button>
               </div>
             </form>
           </section>
@@ -281,20 +281,11 @@
 
         <article class="payment-panel card">
           <div class="section-title-row">
-            <h2>Pago de Préstamo</h2>
+            <h2>💸 Pago de Préstamo</h2>
           </div>
 
           <div id="selectedMemberInfo" class="selected-member empty">
             Seleccione un socio o socia
-          </div>
-
-          <div class="wallet-row">
-            <button id="jarPrincipalBtn" class="jar-toggle active" data-target="principal">
-              Alcancía Grande
-            </button>
-            <button id="jarInterestBtn" class="jar-toggle" data-target="interest">
-              Alcancía Pequeña
-            </button>
           </div>
 
           <div class="jar-grid">
@@ -313,13 +304,13 @@
           </div>
 
           <div class="token-zone">
-            <p class="token-label">Fichas de monto</p>
+            <p class="token-label">🪙 Fichas de monto</p>
             <div id="tokenRack" class="token-rack"></div>
           </div>
 
           <div class="action-row">
-            <button id="resetDraftBtn" class="danger-btn">X Borrar</button>
-            <button id="savePaymentBtn" class="confirm-btn">Guardar Pago</button>
+            <button id="resetDraftBtn" class="danger-btn">🧹 Borrar</button>
+            <button id="savePaymentBtn" class="confirm-btn">✅ Guardar Pago</button>
           </div>
           <p id="statusMsg" class="status-msg" aria-live="polite"></p>
         </article>
@@ -329,7 +320,7 @@
         <div id="inlineCameraBackdrop" class="member-admin-backdrop"></div>
         <section class="member-admin-dialog inline-camera-dialog" role="dialog" aria-modal="true" aria-labelledby="inlineCameraTitle">
           <div class="member-admin-header">
-            <h3 id="inlineCameraTitle">Tomar foto</h3>
+            <h3 id="inlineCameraTitle">📷 Tomar foto</h3>
             <button
               id="closeInlineCameraBtn"
               class="close-member-admin-btn"
@@ -347,8 +338,8 @@
           </div>
 
           <div class="inline-camera-actions">
-            <button id="captureInlineCameraBtn" class="photo-action-btn camera" type="button">Capturar</button>
-            <button id="cancelInlineCameraBtn" class="photo-action-btn" type="button">Cancelar</button>
+            <button id="captureInlineCameraBtn" class="photo-action-btn camera" type="button">📸 Capturar</button>
+            <button id="cancelInlineCameraBtn" class="photo-action-btn" type="button">↩️ Cancelar</button>
           </div>
         </section>
       </div>
