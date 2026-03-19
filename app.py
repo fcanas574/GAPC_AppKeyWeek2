@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request, url_for
+from flask import Flask, jsonify, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "gapc.db"
-UPLOADS_DIR = BASE_DIR / "static" / "uploads"
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+RUNTIME_DATA_DIR = Path("/tmp/gapc_app") if IS_VERCEL else BASE_DIR
+DB_PATH = RUNTIME_DATA_DIR / "gapc.db"
+UPLOADS_DIR = RUNTIME_DATA_DIR / "uploads"
 
 
 def utc_now_iso() -> str:
@@ -29,6 +32,10 @@ def create_app() -> Flask:
 	def index() -> str:
 		state = get_state()
 		return render_template("index.html", state=state)
+
+	@app.get("/uploads/<path:filename>")
+	def uploaded_file(filename: str) -> Any:
+		return send_from_directory(UPLOADS_DIR, filename)
 
 	@app.get("/api/state")
 	def api_state() -> Any:
@@ -699,7 +706,7 @@ def get_state() -> dict[str, Any]:
 				"photo_emoji": row["photo_emoji"],
 				"gender": row["gender"],
 				"photo_url": (
-					url_for("static", filename=f"uploads/{row['photo_path']}")
+					url_for("uploaded_file", filename=row["photo_path"])
 					if row["photo_path"]
 					else None
 				),
