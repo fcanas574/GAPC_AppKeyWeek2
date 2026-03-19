@@ -110,16 +110,9 @@
                     Subir de galeria
                     <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
                   </label>
-                  <label class="photo-action-btn camera file-trigger">
+                  <button id="openInlineCameraBtn" class="photo-action-btn camera" type="button">
                     Tomar foto
-                    <input
-                      id="memberCameraInput"
-                      name="photo_camera"
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                    />
-                  </label>
+                  </button>
                 </div>
                 <p id="memberPhotoName" class="photo-file-label">Sin foto seleccionada</p>
                 <div id="memberPhotoPreviewWrap" class="member-photo-preview hidden">
@@ -316,6 +309,34 @@
           <p id="statusMsg" class="status-msg" aria-live="polite"></p>
         </article>
       </section>
+
+      <div id="inlineCameraModal" class="member-admin-modal hidden" aria-hidden="true">
+        <div id="inlineCameraBackdrop" class="member-admin-backdrop"></div>
+        <section class="member-admin-dialog inline-camera-dialog" role="dialog" aria-modal="true" aria-labelledby="inlineCameraTitle">
+          <div class="member-admin-header">
+            <h3 id="inlineCameraTitle">Tomar foto</h3>
+            <button
+              id="closeInlineCameraBtn"
+              class="close-member-admin-btn"
+              type="button"
+              aria-label="Cerrar camara"
+              title="Cerrar camara"
+            >
+              ×
+            </button>
+          </div>
+
+          <div class="inline-camera-frame">
+            <video id="inlineCameraVideo" autoplay playsinline muted></video>
+            <canvas id="inlineCameraCanvas" class="hidden"></canvas>
+          </div>
+
+          <div class="inline-camera-actions">
+            <button id="captureInlineCameraBtn" class="photo-action-btn camera" type="button">Capturar</button>
+            <button id="cancelInlineCameraBtn" class="photo-action-btn" type="button">Cancelar</button>
+          </div>
+        </section>
+      </div>
     </main>
 
     <script id="initialState" type="application/json">

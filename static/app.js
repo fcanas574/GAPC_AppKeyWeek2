@@ -50,10 +50,17 @@ const adminInterestTokens = document.getElementById('adminInterestTokens');
 const clearPrincipalBtn = document.getElementById('clearPrincipalBtn');
 const clearInterestBtn = document.getElementById('clearInterestBtn');
 const memberPhotoInput = document.getElementById('memberPhotoInput');
-const memberCameraInput = document.getElementById('memberCameraInput');
+const openInlineCameraBtn = document.getElementById('openInlineCameraBtn');
 const memberPhotoName = document.getElementById('memberPhotoName');
 const memberPhotoPreviewWrap = document.getElementById('memberPhotoPreviewWrap');
 const memberPhotoPreview = document.getElementById('memberPhotoPreview');
+const inlineCameraModal = document.getElementById('inlineCameraModal');
+const inlineCameraBackdrop = document.getElementById('inlineCameraBackdrop');
+const closeInlineCameraBtn = document.getElementById('closeInlineCameraBtn');
+const cancelInlineCameraBtn = document.getElementById('cancelInlineCameraBtn');
+const captureInlineCameraBtn = document.getElementById('captureInlineCameraBtn');
+const inlineCameraVideo = document.getElementById('inlineCameraVideo');
+const inlineCameraCanvas = document.getElementById('inlineCameraCanvas');
 const memberSaveBtn = document.querySelector('#memberForm .member-save-btn');
 const wizardStepRows = Array.from(document.querySelectorAll('.member-wizard-step'));
 const resetDraftBtn = document.getElementById('resetDraftBtn');
@@ -102,6 +109,9 @@ let touchDragState = null;
 let touchDragGhost = null;
 let touchDropHighlightEl = null;
 let memberPhotoPreviewObjectUrl = '';
+let inlineCameraStream = null;
+let capturedMemberPhotoFile = null;
+let capturedMemberPhotoName = '';
 
 const coinImageByValue = {
   '0.01': '/static/static/images/coins/1c_c.jpg',
@@ -930,9 +940,8 @@ function closeMemberAdminModal() {
   if (memberPhotoInput) {
     memberPhotoInput.value = '';
   }
-  if (memberCameraInput) {
-    memberCameraInput.value = '';
-  }
+  capturedMemberPhotoFile = null;
+  closeInlineCameraModal();
   clearMemberPhotoPreview();
 }
 
@@ -975,6 +984,107 @@ function applyMemberPhotoPreview(file) {
   if (memberPhotoName) {
     memberPhotoName.textContent = file.name || 'Foto seleccionada';
   }
+}
+
+function stopInlineCameraStream() {
+  if (!inlineCameraStream) {
+    return;
+  }
+
+  for (const track of inlineCameraStream.getTracks()) {
+    track.stop();
+  }
+  inlineCameraStream = null;
+  if (inlineCameraVideo) {
+    inlineCameraVideo.srcObject = null;
+  }
+}
+
+async function openInlineCameraModal() {
+  if (!inlineCameraModal || !inlineCameraVideo) {
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setStatus('Tu navegador no permite camara en esta pagina', 'error');
+    speak('Tu navegador no permite camara en esta pagina', 'critical');
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+      },
+      audio: false,
+    });
+
+    inlineCameraStream = stream;
+    inlineCameraVideo.srcObject = stream;
+    inlineCameraModal.classList.remove('hidden');
+    inlineCameraModal.setAttribute('aria-hidden', 'false');
+  } catch (error) {
+    setStatus('No se pudo abrir la camara. Revisa permisos.', 'error');
+    speak('No se pudo abrir la camara. Revisa permisos.', 'critical');
+  }
+}
+
+function closeInlineCameraModal() {
+  if (!inlineCameraModal) {
+    return;
+  }
+
+  inlineCameraModal.classList.add('hidden');
+  inlineCameraModal.setAttribute('aria-hidden', 'true');
+  stopInlineCameraStream();
+}
+
+async function captureInlinePhoto() {
+  if (!inlineCameraVideo || !inlineCameraCanvas) {
+    return;
+  }
+
+  const width = inlineCameraVideo.videoWidth;
+  const height = inlineCameraVideo.videoHeight;
+  if (!width || !height) {
+    setStatus('La camara aun no esta lista', 'error');
+    speak('La camara aun no esta lista', 'critical');
+    return;
+  }
+
+  inlineCameraCanvas.width = width;
+  inlineCameraCanvas.height = height;
+  const context = inlineCameraCanvas.getContext('2d');
+  if (!context) {
+    return;
+  }
+  context.drawImage(inlineCameraVideo, 0, 0, width, height);
+
+  const blob = await new Promise((resolve) => {
+    inlineCameraCanvas.toBlob(resolve, 'image/jpeg', 0.92);
+  });
+
+  if (!blob) {
+    setStatus('No se pudo capturar la foto', 'error');
+    speak('No se pudo capturar la foto', 'critical');
+    return;
+  }
+
+  const fileName = `captura_${Date.now()}.jpg`;
+  capturedMemberPhotoName = fileName;
+  capturedMemberPhotoFile =
+    typeof File === 'function'
+      ? new File([blob], fileName, { type: 'image/jpeg' })
+      : blob;
+
+  if (memberPhotoInput) {
+    memberPhotoInput.value = '';
+  }
+
+  applyMemberPhotoPreview(capturedMemberPhotoFile);
+  closeInlineCameraModal();
+  setStatus('Foto capturada', 'ok');
+  speak('Foto capturada', 'critical');
 }
 
 function announceMemberWizardStep() {
@@ -1830,7 +1940,12 @@ async function saveMember(event) {
   try {
     const response = await fetch('/api/member/save', {
       method: 'POST',
-      body: formData,
+      body: (() => {
+        if (capturedMemberPhotoFile) {
+          formData.set('photo', capturedMemberPhotoFile, capturedMemberPhotoName || 'captura.jpg');
+        }
+        return formData;
+      })(),
     });
     const data = await response.json();
     if (!response.ok || !data.ok) {
@@ -1852,6 +1967,8 @@ async function saveMember(event) {
     if (memberPhotoInput) {
       memberPhotoInput.value = '';
     }
+    capturedMemberPhotoFile = null;
+    capturedMemberPhotoName = '';
     clearMemberPhotoPreview();
   } catch (error) {
     setStatus(error.message, 'error');
@@ -2167,6 +2284,7 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     closeMemberAdminModal();
     closeMemberSettingsModal();
+    closeInlineCameraModal();
   }
 });
 if (memberMode) {
@@ -2220,21 +2338,31 @@ if (memberForm) {
 if (memberPhotoInput) {
   memberPhotoInput.addEventListener('change', () => {
     const file = memberPhotoInput.files && memberPhotoInput.files.length ? memberPhotoInput.files[0] : null;
-    if (file && memberCameraInput) {
-      memberCameraInput.value = '';
+    if (file) {
+      capturedMemberPhotoFile = null;
+      capturedMemberPhotoName = '';
     }
     applyMemberPhotoPreview(file);
     speak('Foto añadida.', 'critical');
   });
 }
-if (memberCameraInput) {
-  memberCameraInput.addEventListener('change', () => {
-    const file = memberCameraInput.files && memberCameraInput.files.length ? memberCameraInput.files[0] : null;
-    if (file && memberPhotoInput) {
-      memberPhotoInput.value = '';
-    }
-    applyMemberPhotoPreview(file);
-    speak('Foto añadida.', 'critical');
+if (openInlineCameraBtn) {
+  openInlineCameraBtn.addEventListener('click', () => {
+    openInlineCameraModal();
+  });
+}
+if (closeInlineCameraBtn) {
+  closeInlineCameraBtn.addEventListener('click', closeInlineCameraModal);
+}
+if (cancelInlineCameraBtn) {
+  cancelInlineCameraBtn.addEventListener('click', closeInlineCameraModal);
+}
+if (inlineCameraBackdrop) {
+  inlineCameraBackdrop.addEventListener('click', closeInlineCameraModal);
+}
+if (captureInlineCameraBtn) {
+  captureInlineCameraBtn.addEventListener('click', () => {
+    captureInlinePhoto();
   });
 }
 if (memberWizardPrevBtn) {
