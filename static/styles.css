@@ -585,14 +585,19 @@ h2 {
   left: 6px;
   width: 32px;
   height: 32px;
+  padding: 0;
   border: 2px solid #5f5645;
   border-radius: 999px;
   background: #fff7df;
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  text-align: center;
   cursor: pointer;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 2;
 }
 
@@ -1066,6 +1071,7 @@ h2 {
   .member-config-btn {
     width: 30px;
     height: 30px;
+    font-size: 0.9rem;
   }
 
   .att-btn {

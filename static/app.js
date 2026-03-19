@@ -1212,7 +1212,7 @@ function memberCardTemplate(member) {
         data-member-id="${member.id}"
         aria-label="Configurar ${member.name}"
         title="Configurar ${member.name}"
-      >⚙️</button>
+      >⚙</button>
       <p class="member-photo">${memberPhotoMarkup(member, 'member-photo-img', member.name)}</p>
       <p class="member-name">${member.name}</p>
       <div class="attendance-row">
