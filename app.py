@@ -167,6 +167,58 @@ def create_app() -> Flask:
 
 		return jsonify({"ok": True, "member_id": saved_member_id, "state": get_state()})
 
+	@app.post("/api/member/delete")
+	def api_member_delete() -> Any:
+		payload = request.get_json(silent=True) or {}
+		member_id = payload.get("member_id")
+
+		if not isinstance(member_id, int):
+			return jsonify({"ok": False, "error": "Socio/a invalido/a"}), 400
+
+		try:
+			delete_member(member_id)
+		except ValueError as error:
+			return jsonify({"ok": False, "error": str(error)}), 400
+
+		return jsonify({"ok": True, "state": get_state()})
+
+	@app.post("/api/member/update")
+	def api_member_update() -> Any:
+		payload = request.get_json(silent=True) or {}
+		member_id = payload.get("member_id")
+		name = (payload.get("name") or "").strip()
+		gender = normalize_gender(payload.get("gender"))
+		principal_raw = payload.get("principal_total")
+		interest_raw = payload.get("interest_total")
+
+		if not isinstance(member_id, int):
+			return jsonify({"ok": False, "error": "Socio/a invalido/a"}), 400
+
+		if not name:
+			return jsonify({"ok": False, "error": "Nombre requerido"}), 400
+
+		try:
+			principal_total = round(float(principal_raw), 2)
+			interest_total = round(float(interest_raw), 2)
+		except (TypeError, ValueError):
+			return jsonify({"ok": False, "error": "Monto de prestamo invalido"}), 400
+
+		if principal_total < 0 or interest_total < 0:
+			return jsonify({"ok": False, "error": "Monto de prestamo invalido"}), 400
+
+		try:
+			update_member_attributes(
+				member_id=member_id,
+				name=name,
+				gender=gender,
+				principal_total=principal_total,
+				interest_total=interest_total,
+			)
+		except ValueError as error:
+			return jsonify({"ok": False, "error": str(error)}), 400
+
+		return jsonify({"ok": True, "state": get_state(), "member_id": member_id})
+
 	return app
 
 
@@ -356,6 +408,64 @@ def create_or_update_member(
 			(member_id, principal_total, interest_total),
 		)
 		return member_id
+
+
+def delete_member(member_id: int) -> None:
+	with get_connection() as conn:
+		existing = conn.execute(
+			"SELECT id, photo_path FROM members WHERE id = ?",
+			(member_id,),
+		).fetchone()
+		if not existing:
+			raise ValueError("Socio/a no encontrado/a")
+
+		conn.execute("DELETE FROM attendance WHERE member_id = ?", (member_id,))
+		conn.execute("DELETE FROM payments WHERE member_id = ?", (member_id,))
+		conn.execute("DELETE FROM loans WHERE member_id = ?", (member_id,))
+		conn.execute("DELETE FROM members WHERE id = ?", (member_id,))
+
+	photo_path = existing["photo_path"]
+	if photo_path:
+		photo_file = UPLOADS_DIR / str(photo_path)
+		if photo_file.exists():
+			try:
+				photo_file.unlink()
+			except OSError:
+				pass
+
+
+def update_member_attributes(
+	*,
+	member_id: int,
+	name: str,
+	gender: str,
+	principal_total: float,
+	interest_total: float,
+) -> None:
+	with get_connection() as conn:
+		existing = conn.execute(
+			"SELECT id FROM members WHERE id = ?",
+			(member_id,),
+		).fetchone()
+		if not existing:
+			raise ValueError("Socio/a no encontrado/a")
+
+		emoji = default_emoji_for_gender(gender)
+		conn.execute(
+			"UPDATE members SET name = ?, gender = ?, photo_emoji = ? WHERE id = ?",
+			(name, gender, emoji, member_id),
+		)
+		conn.execute(
+			"""
+			INSERT INTO loans(member_id, principal_total, interest_total)
+			VALUES (?, ?, ?)
+			ON CONFLICT(member_id)
+			DO UPDATE SET
+				principal_total = excluded.principal_total,
+				interest_total = excluded.interest_total
+			""",
+			(member_id, principal_total, interest_total),
+		)
 
 
 def reset_database() -> None:
@@ -602,4 +712,4 @@ if __name__ == "__main__":
 		reset_database()
 		print(f"Base de datos reiniciada: {DB_PATH}")
 	else:
-		app.run(debug=True, host="localhost", port=8000)
+		app.run(debug=True, host="0.0.0.0", port=8000)

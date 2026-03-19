@@ -454,6 +454,7 @@ h2 {
 }
 
 .member-card {
+  position: relative;
   border: 2px solid var(--stroke);
   border-radius: 16px;
   background: #fff;
@@ -478,6 +479,27 @@ h2 {
 
 .member-card.absent {
   background: #f9dfdf;
+}
+
+.member-config-btn {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 32px;
+  height: 32px;
+  border: 2px solid #5f5645;
+  border-radius: 999px;
+  background: #fff7df;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+
+.member-config-btn:hover {
+  transform: translateY(-1px);
 }
 
 .member-photo {
@@ -747,6 +769,17 @@ h2 {
   margin-top: 14px;
   display: grid;
   grid-template-columns: 1fr 1.1fr;
+  gap: 10px;
+}
+
+.member-settings-dialog {
+  width: min(560px, 94vw);
+}
+
+.member-settings-actions {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 

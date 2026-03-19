@@ -18,6 +18,16 @@ const memberAdminModal = document.getElementById('memberAdminModal');
 const memberAdminBackdrop = document.getElementById('memberAdminBackdrop');
 const closeMemberAdminBtn = document.getElementById('closeMemberAdminBtn');
 const memberForm = document.getElementById('memberForm');
+const memberSettingsModal = document.getElementById('memberSettingsModal');
+const memberSettingsBackdrop = document.getElementById('memberSettingsBackdrop');
+const closeMemberSettingsBtn = document.getElementById('closeMemberSettingsBtn');
+const memberSettingsForm = document.getElementById('memberSettingsForm');
+const settingsMemberId = document.getElementById('settingsMemberId');
+const settingsMemberName = document.getElementById('settingsMemberName');
+const settingsMemberGender = document.getElementById('settingsMemberGender');
+const settingsPrincipalTotal = document.getElementById('settingsPrincipalTotal');
+const settingsInterestTotal = document.getElementById('settingsInterestTotal');
+const deleteMemberSettingsBtn = document.getElementById('deleteMemberSettingsBtn');
 const memberWizardProgress = document.getElementById('memberWizardProgress');
 const memberWizardPrevBtn = document.getElementById('memberWizardPrevBtn');
 const memberWizardNextBtn = document.getElementById('memberWizardNextBtn');
@@ -74,7 +84,7 @@ let nameListening = false;
 let nameBaseValue = '';
 let memberWizardLastStep = '';
 let memberWizardCurrentStep = 1;
-const memberWizardTotalSteps = 5;
+const memberWizardTotalSteps = 4;
 
 const coinImageByValue = {
   '0.01': '/static/static/images/coins/1c_c.jpg',
@@ -658,7 +668,7 @@ function narrateSimpleStep(stepKey, message) {
 }
 
 function getWizardMode() {
-  return memberMode?.value === 'existing' ? 'existing' : 'new';
+  return 'new';
 }
 
 function isWizardRowVisible(row, mode) {
@@ -670,35 +680,26 @@ function isWizardRowVisible(row, mode) {
 }
 
 function narrateCurrentWizardStep() {
-  const mode = getWizardMode();
   if (memberWizardCurrentStep === 1) {
-    narrateSelectStep('wizard-step-1', 1, 'seleccione el modo', memberMode);
+    narrateSelectStep('wizard-step-1', 1, 'seleccione el género', memberGenderSelect);
     return;
   }
   if (memberWizardCurrentStep === 2) {
-    narrateSelectStep('wizard-step-2', 2, 'seleccione el género', memberGenderSelect);
+    narrateSimpleStep(
+      'wizard-step-2',
+      'Paso 2: escriba nombre y puede añadir foto. Primera opción: teclado. Segunda opción: micrófono.',
+    );
     return;
   }
   if (memberWizardCurrentStep === 3) {
-    if (mode === 'existing') {
-      narrateSelectStep('wizard-step-3-existing', 3, 'elija el socio existente', existingMemberSelect);
-    } else {
-      narrateSimpleStep(
-        'wizard-step-3-new',
-        'Paso 3: escriba nombre y puede añadir foto. Primera opción: teclado. Segunda opción: micrófono.',
-      );
-    }
-    return;
-  }
-  if (memberWizardCurrentStep === 4) {
     narrateSimpleStep(
-      'wizard-step-4',
-      'Paso 4: registre préstamo e interés. Primera opción: escribir monto. Segunda opción: usar fichas.',
+      'wizard-step-3',
+      'Paso 3: registre préstamo e interés. Primera opción: escribir monto. Segunda opción: usar fichas.',
     );
     return;
   }
 
-  narrateSimpleStep('wizard-step-5', 'Paso 5: confirme y guarde.');
+  narrateSimpleStep('wizard-step-4', 'Paso 4: confirme y guarde.');
 }
 
 function focusWizardStep() {
@@ -741,22 +742,15 @@ function renderMemberWizardStep() {
 }
 
 function validateWizardStep(stepNumber) {
-  const mode = getWizardMode();
-  if (stepNumber === 3) {
-    if (mode === 'existing' && !String(existingMemberSelect?.value || '').trim()) {
-      setStatus('Seleccione un socio existente', 'error');
-      speak('Seleccione un socio existente.', 'critical');
-      return false;
-    }
-
-    if (mode === 'new' && !String(memberNameInput?.value || '').trim()) {
+  if (stepNumber === 2) {
+    if (!String(memberNameInput?.value || '').trim()) {
       setStatus('Ingrese nombre del nuevo socio o socia', 'error');
       speak('Ingrese nombre del nuevo socio o socia.', 'critical');
       return false;
     }
   }
 
-  if (stepNumber === 4) {
+  if (stepNumber === 3) {
     const principal = Number.parseFloat(principalTotalInput?.value || '0');
     const interest = Number.parseFloat(interestTotalInput?.value || '0');
     if (!Number.isFinite(principal) || !Number.isFinite(interest) || principal < 0 || interest < 0) {
@@ -928,6 +922,13 @@ function memberCardTemplate(member) {
   const selectedClass = member.id === selectedMemberId ? 'selected' : '';
   return `
     <article class="member-card ${member.attendance} ${selectedClass}" data-member-id="${member.id}">
+      <button
+        class="member-config-btn"
+        type="button"
+        data-member-id="${member.id}"
+        aria-label="Configurar ${member.name}"
+        title="Configurar ${member.name}"
+      >⚙️</button>
       <p class="member-photo">${memberPhotoMarkup(member, 'member-photo-img', member.name)}</p>
       <p class="member-name">${member.name}</p>
       <div class="attendance-row">
@@ -1009,7 +1010,7 @@ function tokenTemplate(tokenEntry) {
 
   if (tokenEntry.kind === 'coin' && coinSrc) {
     return `
-      <button class="money-token" draggable="true" data-value="${value}" title="${money(value)}">
+      <button type="button" class="money-token" draggable="true" data-value="${value}" title="${money(value)}">
         <img class="coin-image" src="${coinSrc}" alt="Moneda ${money(value)}" />
         <span class="coin-value">${money(value)}</span>
       </button>
@@ -1018,7 +1019,7 @@ function tokenTemplate(tokenEntry) {
 
   if (tokenEntry.kind === 'bill' && billSrc) {
     return `
-      <button class="money-token bill-token" draggable="true" data-value="${value}" title="${money(value)}">
+      <button type="button" class="money-token bill-token" draggable="true" data-value="${value}" title="${money(value)}">
         <img class="bill-image" src="${billSrc}" alt="Billete ${money(value)}" />
         <span class="coin-value">${money(value)}</span>
       </button>
@@ -1027,7 +1028,7 @@ function tokenTemplate(tokenEntry) {
 
   if (coinSrc) {
     return `
-      <button class="money-token" draggable="true" data-value="${value}" title="${money(value)}">
+      <button type="button" class="money-token" draggable="true" data-value="${value}" title="${money(value)}">
         <img class="coin-image" src="${coinSrc}" alt="Moneda ${money(value)}" />
         <span class="coin-value">${money(value)}</span>
       </button>
@@ -1036,7 +1037,7 @@ function tokenTemplate(tokenEntry) {
 
   if (billSrc) {
     return `
-      <button class="money-token bill-token" draggable="true" data-value="${value}" title="${money(value)}">
+      <button type="button" class="money-token bill-token" draggable="true" data-value="${value}" title="${money(value)}">
         <img class="bill-image" src="${billSrc}" alt="Billete ${money(value)}" />
         <span class="coin-value">${money(value)}</span>
       </button>
@@ -1045,14 +1046,14 @@ function tokenTemplate(tokenEntry) {
 
   if (numeric >= 5) {
     return `
-      <button class="money-token bill-token" draggable="true" data-value="${value}" title="${money(value)}">
+      <button type="button" class="money-token bill-token" draggable="true" data-value="${value}" title="${money(value)}">
         <span class="bill-top">Billete</span>
         <span class="bill-value">${money(value)}</span>
       </button>
     `;
   }
 
-  return `<button class="money-token" draggable="true" data-value="${value}">${money(value)}</button>`;
+  return `<button type="button" class="money-token" draggable="true" data-value="${value}">${money(value)}</button>`;
 }
 
 function renderTokens() {
@@ -1348,27 +1349,11 @@ async function resetDemoData() {
 }
 
 function handleMemberModeChange() {
-  if (!memberMode || !existingMemberWrap || !memberNameInput) {
+  if (!memberNameInput) {
     return;
   }
 
-  updateMemberModeLabels();
-
-  const isExisting = memberMode.value === 'existing';
-  existingMemberWrap.classList.toggle('hidden', !isExisting);
-  memberNameInput.required = !isExisting;
-
-  if (isExisting && existingMemberSelect && !existingMemberSelect.value && selectedMemberId) {
-    existingMemberSelect.value = String(selectedMemberId);
-  }
-
-  if (isExisting && existingMemberSelect?.value) {
-    const member = getMemberById(Number(existingMemberSelect.value));
-    if (member && memberGenderSelect) {
-      memberGenderSelect.value = normalizeGender(member.gender);
-      updateMemberModeLabels();
-    }
-  }
+  memberNameInput.required = true;
 
   renderMemberWizardStep();
 }
@@ -1380,30 +1365,16 @@ async function saveMember(event) {
   }
 
   if (memberWizardCurrentStep < memberWizardTotalSteps) {
-    goToNextWizardStep();
+    setStatus('Complete el paso y use Siguiente para continuar', 'ok');
     return;
   }
 
   const formData = new FormData(memberForm);
-  const selectedExistingId = String(existingMemberSelect?.value || '').trim();
   const typedName = String(memberNameInput?.value || '').trim();
-  const effectiveMode =
-    memberMode?.value === 'existing' || (selectedExistingId && typedName.length === 0)
-      ? 'existing'
-      : 'new';
+  const effectiveMode = 'new';
 
   formData.set('mode', effectiveMode);
-  if (effectiveMode === 'existing') {
-    formData.set('member_id', selectedExistingId);
-  } else {
-    formData.delete('member_id');
-  }
-
-  if (effectiveMode === 'existing' && !selectedExistingId) {
-    setStatus('Seleccione un socio o socia para actualizar', 'error');
-    speak('Seleccione un socio o socia para actualizar', 'critical');
-    return;
-  }
+  formData.delete('member_id');
 
   if (effectiveMode === 'new' && !typedName) {
     const noun = memberNoun(memberGenderSelect?.value);
@@ -1443,7 +1414,132 @@ async function saveMember(event) {
   }
 }
 
+function openMemberSettingsModal(memberId) {
+  const member = getMemberById(memberId);
+  if (!member || !memberSettingsModal) {
+    return;
+  }
+
+  settingsMemberId.value = String(member.id);
+  settingsMemberName.value = String(member.name || '');
+  settingsMemberGender.value = normalizeGender(member.gender);
+  settingsPrincipalTotal.value = Number(member.loan.principal_total || 0).toFixed(2);
+  settingsInterestTotal.value = Number(member.loan.interest_total || 0).toFixed(2);
+
+  memberSettingsModal.classList.remove('hidden');
+  memberSettingsModal.setAttribute('aria-hidden', 'false');
+  settingsMemberName.focus();
+}
+
+function closeMemberSettingsModal() {
+  if (!memberSettingsModal) {
+    return;
+  }
+  memberSettingsModal.classList.add('hidden');
+  memberSettingsModal.setAttribute('aria-hidden', 'true');
+}
+
+async function saveMemberSettings(event) {
+  event.preventDefault();
+  const memberId = Number(settingsMemberId?.value || 0);
+  const name = String(settingsMemberName?.value || '').trim();
+  const gender = normalizeGender(settingsMemberGender?.value);
+  const principalTotal = Number.parseFloat(settingsPrincipalTotal?.value || '0');
+  const interestTotal = Number.parseFloat(settingsInterestTotal?.value || '0');
+
+  if (!memberId) {
+    setStatus('Socio/a invalido/a', 'error');
+    speak('Socio o socia invalido', 'critical');
+    return;
+  }
+  if (!name) {
+    setStatus('Nombre requerido', 'error');
+    speak('Nombre requerido', 'critical');
+    return;
+  }
+  if (!Number.isFinite(principalTotal) || !Number.isFinite(interestTotal) || principalTotal < 0 || interestTotal < 0) {
+    setStatus('Ingrese préstamo e interés válidos', 'error');
+    speak('Ingrese préstamo e interés válidos.', 'critical');
+    return;
+  }
+
+  try {
+    const data = await postJson('/api/member/update', {
+      member_id: memberId,
+      name,
+      gender,
+      principal_total: principalTotal,
+      interest_total: interestTotal,
+    });
+
+    state = data.state;
+    if (Number.isInteger(selectedMemberId)) {
+      saveDraftForMember(selectedMemberId);
+    }
+    selectedMemberId = memberId;
+    ensureSelectedMember();
+    hydrateDraftFromState();
+    renderAll();
+    handleMemberModeChange();
+    setStatus('Cambios del socio/a guardados', 'ok');
+    speak('Cambios guardados', 'critical');
+    closeMemberSettingsModal();
+  } catch (error) {
+    setStatus(error.message, 'error');
+    speak(error.message, 'critical');
+  }
+}
+
+async function deleteMemberFromSettings() {
+  const selectedExistingId = Number(settingsMemberId?.value || 0);
+  if (!selectedExistingId) {
+    setStatus('Seleccione un socio o socia para eliminar', 'error');
+    speak('Seleccione un socio o socia para eliminar', 'critical');
+    return;
+  }
+
+  const member = getMemberById(selectedExistingId);
+  const memberName = member?.name || 'este socio';
+  const confirmed = window.confirm(`¿Eliminar a ${memberName}? Esta acción no se puede deshacer.`);
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const data = await postJson('/api/member/delete', { member_id: selectedExistingId });
+    state = data.state;
+    paymentDraftByMemberId.delete(selectedExistingId);
+    ensureSelectedMember();
+    hydrateDraftFromState();
+    renderAll();
+    handleMemberModeChange();
+
+    const hasMembers = Array.isArray(state.members) && state.members.length > 0;
+    if (!hasMembers && memberMode) {
+      memberMode.value = 'new';
+      handleMemberModeChange();
+      goToWizardStep(1);
+    }
+
+    setStatus('Socio/a eliminado/a', 'ok');
+    speak('Socio o socia eliminado', 'critical');
+    closeMemberSettingsModal();
+  } catch (error) {
+    setStatus(error.message, 'error');
+    speak(error.message, 'critical');
+  }
+}
+
 memberGrid.addEventListener('click', (event) => {
+  const configBtn = event.target.closest('.member-config-btn');
+  if (configBtn) {
+    const memberId = Number(configBtn.dataset.memberId);
+    if (Number.isInteger(memberId) && memberId > 0) {
+      openMemberSettingsModal(memberId);
+    }
+    return;
+  }
+
   if (paymentSaveInFlight) {
     setStatus('Guardando pago, espere un momento', 'ok');
     return;
@@ -1600,6 +1696,7 @@ if (memberAdminBackdrop) {
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     closeMemberAdminModal();
+    closeMemberSettingsModal();
   }
 });
 if (memberMode) {
@@ -1662,6 +1759,18 @@ if (memberWizardPrevBtn) {
 }
 if (memberWizardNextBtn) {
   memberWizardNextBtn.addEventListener('click', goToNextWizardStep);
+}
+if (memberSettingsBackdrop) {
+  memberSettingsBackdrop.addEventListener('click', closeMemberSettingsModal);
+}
+if (closeMemberSettingsBtn) {
+  closeMemberSettingsBtn.addEventListener('click', closeMemberSettingsModal);
+}
+if (memberSettingsForm) {
+  memberSettingsForm.addEventListener('submit', saveMemberSettings);
+}
+if (deleteMemberSettingsBtn) {
+  deleteMemberSettingsBtn.addEventListener('click', deleteMemberFromSettings);
 }
 
 initTts();

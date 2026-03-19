@@ -50,8 +50,8 @@
               id="openMemberAdminBtn"
               class="open-member-admin-btn"
               type="button"
-              aria-label="Añadir o gestionar socio"
-              title="Añadir o gestionar socio"
+              aria-label="Añadir socio/a"
+              title="Añadir socio/a"
             >
               +
             </button>
@@ -64,7 +64,7 @@
           <div id="memberAdminBackdrop" class="member-admin-backdrop"></div>
           <section class="member-admin-dialog" role="dialog" aria-modal="true" aria-labelledby="memberAdminTitle">
             <div class="member-admin-header">
-              <h3 id="memberAdminTitle">Añadir o Gestionar Socios y Préstamos</h3>
+              <h3 id="memberAdminTitle">Añadir Socios y Préstamos</h3>
               <button
                 id="closeMemberAdminBtn"
                 class="close-member-admin-btn"
@@ -75,19 +75,11 @@
                 ×
               </button>
             </div>
-            <p class="member-admin-step-hint">Sigue los pasos: modo, género, nombre, préstamo e interés.</p>
-            <p id="memberWizardProgress" class="member-wizard-progress">Paso 1 de 5</p>
+            <p class="member-admin-step-hint">Sigue los pasos: género, nombre, préstamo e interés, confirmar.</p>
+            <p id="memberWizardProgress" class="member-wizard-progress">Paso 1 de 4</p>
 
             <form id="memberForm" class="member-form" enctype="multipart/form-data">
               <div class="member-form-row member-wizard-step" data-step="1">
-                <label for="memberMode">Modo</label>
-                <select id="memberMode" name="mode">
-                  <option value="new">Nuevo socio/a</option>
-                  <option value="existing">Socio/a existente</option>
-                </select>
-              </div>
-
-              <div class="member-form-row member-wizard-step" data-step="2">
                 <label for="memberGenderSelect">Género</label>
                 <select id="memberGenderSelect" name="gender">
                   <option value="female">Socia</option>
@@ -95,12 +87,7 @@
                 </select>
               </div>
 
-              <div id="existingMemberWrap" class="member-form-row member-wizard-step" data-step="3" data-mode="existing">
-                <label for="existingMemberSelect">Socio/a</label>
-                <select id="existingMemberSelect" name="member_id"></select>
-              </div>
-
-              <div id="newMemberWrap" class="member-form-row member-wizard-step" data-step="3" data-mode="new">
+              <div id="newMemberWrap" class="member-form-row member-wizard-step" data-step="2">
                 <label for="memberNameInput">Nombre</label>
                 <div class="name-input-with-voice">
                   <input id="memberNameInput" name="name" type="text" maxlength="40" />
@@ -116,12 +103,12 @@
                 </div>
               </div>
 
-              <div class="member-form-row member-wizard-step" data-step="3">
+              <div class="member-form-row member-wizard-step" data-step="2">
                 <label for="memberPhotoInput">Foto (opcional)</label>
                 <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
               </div>
 
-              <div class="member-form-row two-cols member-wizard-step" data-step="4">
+              <div class="member-form-row two-cols member-wizard-step" data-step="3">
                 <div>
                   <label for="principalTotalInput">Préstamo</label>
                   <input
@@ -168,7 +155,7 @@
                 </div>
               </div>
 
-              <div class="member-form-row member-wizard-step" data-step="5">
+              <div class="member-form-row member-wizard-step" data-step="4">
                 <p class="member-final-hint">Paso final: revise y guarde.</p>
                 <button type="submit" class="member-save-btn">Guardar Socio/a y Préstamo</button>
               </div>
@@ -176,6 +163,57 @@
               <div class="wizard-nav-row">
                 <button id="memberWizardPrevBtn" class="wizard-nav-btn" type="button">Anterior</button>
                 <button id="memberWizardNextBtn" class="wizard-nav-btn primary" type="button">Siguiente</button>
+              </div>
+            </form>
+          </section>
+        </div>
+
+        <div id="memberSettingsModal" class="member-admin-modal hidden" aria-hidden="true">
+          <div id="memberSettingsBackdrop" class="member-admin-backdrop"></div>
+          <section class="member-admin-dialog member-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="memberSettingsTitle">
+            <div class="member-admin-header">
+              <h3 id="memberSettingsTitle">Configuración del Socio/a</h3>
+              <button
+                id="closeMemberSettingsBtn"
+                class="close-member-admin-btn"
+                type="button"
+                aria-label="Cerrar configuración"
+                title="Cerrar configuración"
+              >
+                ×
+              </button>
+            </div>
+
+            <form id="memberSettingsForm" class="member-form">
+              <input id="settingsMemberId" type="hidden" />
+
+              <div class="member-form-row">
+                <label for="settingsMemberName">Nombre</label>
+                <input id="settingsMemberName" type="text" maxlength="40" required />
+              </div>
+
+              <div class="member-form-row">
+                <label for="settingsMemberGender">Género</label>
+                <select id="settingsMemberGender" required>
+                  <option value="female">Socia</option>
+                  <option value="male">Socio</option>
+                </select>
+              </div>
+
+              <div class="member-form-row two-cols">
+                <div>
+                  <label for="settingsPrincipalTotal">Préstamo principal</label>
+                  <input id="settingsPrincipalTotal" type="number" min="0" step="0.01" required />
+                </div>
+                <div>
+                  <label for="settingsInterestTotal">Interés</label>
+                  <input id="settingsInterestTotal" type="number" min="0" step="0.01" required />
+                </div>
+              </div>
+
+              <div class="member-settings-actions">
+                <button id="deleteMemberSettingsBtn" class="danger-btn" type="button">Eliminar socio/a</button>
+                <button class="confirm-btn" type="submit">Guardar cambios</button>
               </div>
             </form>
           </section>
