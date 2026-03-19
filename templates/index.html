@@ -189,7 +189,18 @@
 
               <div class="member-form-row">
                 <label for="settingsMemberName">Nombre</label>
-                <input id="settingsMemberName" type="text" maxlength="40" required />
+                <div class="name-input-with-voice">
+                  <input id="settingsMemberName" type="text" maxlength="40" required />
+                  <button
+                    id="settingsNameVoiceBtn"
+                    class="name-voice-btn"
+                    type="button"
+                    aria-label="Dictar nombre"
+                    title="Dictar nombre"
+                  >
+                    🎤
+                  </button>
+                </div>
               </div>
 
               <div class="member-form-row">
@@ -204,10 +215,32 @@
                 <div>
                   <label for="settingsPrincipalTotal">Préstamo principal</label>
                   <input id="settingsPrincipalTotal" type="number" min="0" step="0.01" required />
+                  <div class="loan-picker-block">
+                    <div id="settingsPrincipalTokens" class="admin-token-rack" data-target="principal"></div>
+                    <button
+                      id="settingsClearPrincipalBtn"
+                      class="mini-clear-btn"
+                      type="button"
+                      data-target="principal"
+                    >
+                      Limpiar préstamo
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label for="settingsInterestTotal">Interés</label>
                   <input id="settingsInterestTotal" type="number" min="0" step="0.01" required />
+                  <div class="loan-picker-block">
+                    <div id="settingsInterestTokens" class="admin-token-rack" data-target="interest"></div>
+                    <button
+                      id="settingsClearInterestBtn"
+                      class="mini-clear-btn"
+                      type="button"
+                      data-target="interest"
+                    >
+                      Limpiar interés
+                    </button>
+                  </div>
                 </div>
               </div>
 

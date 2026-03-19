@@ -24,9 +24,15 @@ const closeMemberSettingsBtn = document.getElementById('closeMemberSettingsBtn')
 const memberSettingsForm = document.getElementById('memberSettingsForm');
 const settingsMemberId = document.getElementById('settingsMemberId');
 const settingsMemberName = document.getElementById('settingsMemberName');
+const settingsNameVoiceBtn = document.getElementById('settingsNameVoiceBtn');
 const settingsMemberGender = document.getElementById('settingsMemberGender');
 const settingsPrincipalTotal = document.getElementById('settingsPrincipalTotal');
 const settingsInterestTotal = document.getElementById('settingsInterestTotal');
+const settingsPrincipalTokens = document.getElementById('settingsPrincipalTokens');
+const settingsInterestTokens = document.getElementById('settingsInterestTokens');
+const settingsClearPrincipalBtn = document.getElementById('settingsClearPrincipalBtn');
+const settingsClearInterestBtn = document.getElementById('settingsClearInterestBtn');
+const settingsSaveBtn = document.querySelector('#memberSettingsForm .confirm-btn');
 const deleteMemberSettingsBtn = document.getElementById('deleteMemberSettingsBtn');
 const memberWizardProgress = document.getElementById('memberWizardProgress');
 const memberWizardPrevBtn = document.getElementById('memberWizardPrevBtn');
@@ -82,6 +88,9 @@ const nameSttSupported = Boolean(SpeechRecognitionCtor);
 let nameRecognizer = null;
 let nameListening = false;
 let nameBaseValue = '';
+let settingsNameRecognizer = null;
+let settingsNameListening = false;
+let settingsNameBaseValue = '';
 let memberWizardLastStep = '';
 let memberWizardCurrentStep = 1;
 const memberWizardTotalSteps = 4;
@@ -617,6 +626,115 @@ function initNameSpeechToText() {
   });
 }
 
+function updateSettingsNameVoiceButton() {
+  if (!settingsNameVoiceBtn) {
+    return;
+  }
+
+  settingsNameVoiceBtn.classList.remove('listening', 'unsupported');
+  if (!nameSttSupported) {
+    settingsNameVoiceBtn.disabled = true;
+    settingsNameVoiceBtn.classList.add('unsupported');
+    settingsNameVoiceBtn.textContent = '🚫';
+    settingsNameVoiceBtn.setAttribute('aria-label', 'Dictado no disponible');
+    settingsNameVoiceBtn.setAttribute('title', 'Dictado no disponible');
+    return;
+  }
+
+  settingsNameVoiceBtn.disabled = false;
+  if (settingsNameListening) {
+    settingsNameVoiceBtn.classList.add('listening');
+    settingsNameVoiceBtn.textContent = '⏹';
+    settingsNameVoiceBtn.setAttribute('aria-label', 'Detener dictado');
+    settingsNameVoiceBtn.setAttribute('title', 'Detener dictado');
+  } else {
+    settingsNameVoiceBtn.textContent = '🎤';
+    settingsNameVoiceBtn.setAttribute('aria-label', 'Dictar nombre');
+    settingsNameVoiceBtn.setAttribute('title', 'Dictar nombre');
+  }
+}
+
+function initSettingsNameSpeechToText() {
+  updateSettingsNameVoiceButton();
+  if (!settingsNameVoiceBtn || !nameSttSupported || !settingsMemberName) {
+    return;
+  }
+
+  settingsNameRecognizer = new SpeechRecognitionCtor();
+  settingsNameRecognizer.lang = 'es-SV';
+  settingsNameRecognizer.continuous = false;
+  settingsNameRecognizer.interimResults = true;
+  settingsNameRecognizer.maxAlternatives = 1;
+
+  settingsNameRecognizer.onstart = () => {
+    settingsNameListening = true;
+    settingsNameBaseValue = String(settingsMemberName.value || '').trim();
+    updateSettingsNameVoiceButton();
+    setStatus('Escuchando nombre...', 'ok');
+  };
+
+  settingsNameRecognizer.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      transcript += event.results[i][0].transcript;
+    }
+
+    transcript = transcript.trim();
+    if (!transcript) {
+      return;
+    }
+
+    settingsMemberName.value = settingsNameBaseValue
+      ? `${settingsNameBaseValue} ${transcript}`.replace(/\s+/g, ' ').trim()
+      : transcript;
+  };
+
+  settingsNameRecognizer.onerror = () => {
+    setStatus('No se pudo usar el micrófono para dictar nombre', 'error');
+  };
+
+  settingsNameRecognizer.onend = () => {
+    settingsNameListening = false;
+    updateSettingsNameVoiceButton();
+  };
+
+  settingsNameVoiceBtn.addEventListener('click', () => {
+    if (!settingsNameRecognizer) {
+      return;
+    }
+
+    if (settingsNameListening) {
+      speak('Deteniendo dictado de nombre.');
+      settingsNameRecognizer.stop();
+      return;
+    }
+
+    try {
+      speak('Iniciando dictado de nombre.', 'critical');
+      settingsNameRecognizer.start();
+    } catch (error) {
+      setStatus('No se pudo iniciar dictado por voz', 'error');
+    }
+  });
+}
+
+function narrateSettingsActions(member) {
+  if (!member) {
+    return;
+  }
+
+  speak(
+    `Configuración de ${member.name}. Opciones disponibles: ` +
+      'uno, editar nombre con teclado o micrófono. ' +
+      'dos, seleccionar género entre socia y socio. ' +
+      'tres, agregar fichas en préstamo principal. ' +
+      'cuatro, agregar fichas en interés. ' +
+      'cinco, guardar cambios. ' +
+      'seis, eliminar socio o socia.',
+    'critical',
+  );
+}
+
 function setStatus(message, type = '') {
   statusMsg.textContent = message;
   statusMsg.className = 'status-msg';
@@ -1076,6 +1194,12 @@ function renderAdminLoanTokens() {
   if (adminInterestTokens) {
     adminInterestTokens.innerHTML = html;
   }
+  if (settingsPrincipalTokens) {
+    settingsPrincipalTokens.innerHTML = html;
+  }
+  if (settingsInterestTokens) {
+    settingsInterestTokens.innerHTML = html;
+  }
 }
 
 function renderJarSelection() {
@@ -1108,6 +1232,29 @@ function addToLoanInput(target, value) {
 
 function clearLoanInput(target) {
   const input = target === 'principal' ? principalTotalInput : interestTotalInput;
+  if (!input) {
+    return;
+  }
+
+  input.value = '';
+}
+
+function addToSettingsLoanInput(target, value) {
+  if (!Number.isFinite(value)) {
+    return;
+  }
+
+  const input = target === 'principal' ? settingsPrincipalTotal : settingsInterestTotal;
+  if (!input) {
+    return;
+  }
+
+  const currentValue = Number.parseFloat(input.value || '0') || 0;
+  input.value = (currentValue + value).toFixed(2);
+}
+
+function clearSettingsLoanInput(target) {
+  const input = target === 'principal' ? settingsPrincipalTotal : settingsInterestTotal;
   if (!input) {
     return;
   }
@@ -1429,6 +1576,7 @@ function openMemberSettingsModal(memberId) {
   memberSettingsModal.classList.remove('hidden');
   memberSettingsModal.setAttribute('aria-hidden', 'false');
   settingsMemberName.focus();
+  narrateSettingsActions(member);
 }
 
 function closeMemberSettingsModal() {
@@ -1602,8 +1750,27 @@ function bindAdminTokenRack(rackElement, target) {
   });
 }
 
+function bindSettingsTokenRack(rackElement, target) {
+  if (!rackElement) {
+    return;
+  }
+
+  rackElement.addEventListener('click', (event) => {
+    const token = event.target.closest('.money-token');
+    if (!token) {
+      return;
+    }
+    const value = Number(token.dataset.value);
+    addToSettingsLoanInput(target, value);
+    const targetLabel = target === 'principal' ? 'préstamo principal' : 'interés';
+    speak(`Monto añadido a ${targetLabel}: ${amountToSpeech(value)}.`, 'critical');
+  });
+}
+
 bindAdminTokenRack(adminPrincipalTokens, 'principal');
 bindAdminTokenRack(adminInterestTokens, 'interest');
+bindSettingsTokenRack(settingsPrincipalTokens, 'principal');
+bindSettingsTokenRack(settingsInterestTokens, 'interest');
 
 tokenRack.addEventListener('dragstart', (event) => {
   const token = event.target.closest('.money-token');
@@ -1772,9 +1939,94 @@ if (memberSettingsForm) {
 if (deleteMemberSettingsBtn) {
   deleteMemberSettingsBtn.addEventListener('click', deleteMemberFromSettings);
 }
+if (settingsMemberName) {
+  settingsMemberName.addEventListener('focus', () => {
+    speak('Está editando el nombre. Puede escribir o usar el botón de micrófono.');
+  });
+
+  settingsMemberName.addEventListener('change', () => {
+    const value = String(settingsMemberName.value || '').trim();
+    if (!value) {
+      return;
+    }
+    speak(`Nombre actualizado: ${value}.`);
+  });
+}
+if (settingsNameVoiceBtn) {
+  settingsNameVoiceBtn.addEventListener('focus', () => {
+    speak('Opción de dictado de nombre. Presione para hablar el nombre.');
+  });
+}
+if (settingsMemberGender) {
+  settingsMemberGender.addEventListener('focus', () => {
+    speak('Está seleccionando género. Opciones: socia o socio.');
+  });
+
+  settingsMemberGender.addEventListener('change', () => {
+    const noun = memberNoun(settingsMemberGender.value);
+    speak(`Está actualizando género. Seleccionado: ${noun}.`);
+  });
+}
+if (settingsPrincipalTotal) {
+  settingsPrincipalTotal.addEventListener('focus', () => {
+    speak('Está configurando préstamo principal. Puede escribir monto o usar fichas.');
+  });
+
+  settingsPrincipalTotal.addEventListener('change', () => {
+    const value = Number.parseFloat(settingsPrincipalTotal.value || '0');
+    if (!Number.isFinite(value) || value < 0) {
+      return;
+    }
+    speak(`Préstamo principal configurado en ${amountToSpeech(value)}.`);
+  });
+}
+if (settingsInterestTotal) {
+  settingsInterestTotal.addEventListener('focus', () => {
+    speak('Está configurando interés. Puede escribir monto o usar fichas.');
+  });
+
+  settingsInterestTotal.addEventListener('change', () => {
+    const value = Number.parseFloat(settingsInterestTotal.value || '0');
+    if (!Number.isFinite(value) || value < 0) {
+      return;
+    }
+    speak(`Interés configurado en ${amountToSpeech(value)}.`);
+  });
+}
+if (settingsClearPrincipalBtn) {
+  settingsClearPrincipalBtn.addEventListener('focus', () => {
+    speak('Opción para limpiar préstamo principal.');
+  });
+
+  settingsClearPrincipalBtn.addEventListener('click', () => {
+    clearSettingsLoanInput('principal');
+    speak('Préstamo principal limpiado.', 'critical');
+  });
+}
+if (settingsClearInterestBtn) {
+  settingsClearInterestBtn.addEventListener('focus', () => {
+    speak('Opción para limpiar interés.');
+  });
+
+  settingsClearInterestBtn.addEventListener('click', () => {
+    clearSettingsLoanInput('interest');
+    speak('Interés limpiado.', 'critical');
+  });
+}
+if (settingsSaveBtn) {
+  settingsSaveBtn.addEventListener('focus', () => {
+    speak('Opción guardar cambios del socio o socia.');
+  });
+}
+if (deleteMemberSettingsBtn) {
+  deleteMemberSettingsBtn.addEventListener('focus', () => {
+    speak('Opción eliminar socio o socia. Acción permanente.');
+  });
+}
 
 initTts();
 initNameSpeechToText();
+initSettingsNameSpeechToText();
 handleMemberModeChange();
 renderMemberWizardStep();
 ensureSelectedMember();
