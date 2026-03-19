@@ -107,13 +107,28 @@
                 <label for="memberPhotoInput">Foto (opcional)</label>
                 <div class="photo-picker-actions">
                   <label class="photo-action-btn file-trigger">
-                    Subir de galeria
+                    <span class="photo-action-icon" aria-hidden="true">🖼️</span>
+                    <span class="photo-action-title">Subir de galeria</span>
+                    <span class="photo-action-hint">Elegir imagen guardada</span>
                     <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
                   </label>
                   <button id="openInlineCameraBtn" class="photo-action-btn camera" type="button">
-                    Tomar foto
+                    <span class="photo-action-icon" aria-hidden="true">📷</span>
+                    <span class="photo-action-title">Tomar foto</span>
+                    <span class="photo-action-hint">Abrir camara en la app</span>
                   </button>
                 </div>
+                <input
+                  id="memberCameraFallbackInput"
+                  class="visually-hidden-input"
+                  name="photo_camera"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                />
+                <p id="inlineCameraHint" class="photo-camera-note hidden">
+                  Si la camara interna no esta disponible, se abrira el selector nativo del celular.
+                </p>
                 <p id="memberPhotoName" class="photo-file-label">Sin foto seleccionada</p>
                 <div id="memberPhotoPreviewWrap" class="member-photo-preview hidden">
                   <img id="memberPhotoPreview" alt="Vista previa de foto" />

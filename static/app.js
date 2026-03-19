@@ -51,6 +51,8 @@ const clearPrincipalBtn = document.getElementById('clearPrincipalBtn');
 const clearInterestBtn = document.getElementById('clearInterestBtn');
 const memberPhotoInput = document.getElementById('memberPhotoInput');
 const openInlineCameraBtn = document.getElementById('openInlineCameraBtn');
+const memberCameraFallbackInput = document.getElementById('memberCameraFallbackInput');
+const inlineCameraHint = document.getElementById('inlineCameraHint');
 const memberPhotoName = document.getElementById('memberPhotoName');
 const memberPhotoPreviewWrap = document.getElementById('memberPhotoPreviewWrap');
 const memberPhotoPreview = document.getElementById('memberPhotoPreview');
@@ -1000,12 +1002,36 @@ function stopInlineCameraStream() {
   }
 }
 
+function hasInlineCameraSupport() {
+  return Boolean(
+    navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === 'function' &&
+      window.isSecureContext,
+  );
+}
+
+function updateInlineCameraUiSupport() {
+  if (!openInlineCameraBtn) {
+    return;
+  }
+
+  const supported = hasInlineCameraSupport();
+  openInlineCameraBtn.classList.toggle('unsupported', !supported);
+  if (inlineCameraHint) {
+    inlineCameraHint.classList.toggle('hidden', supported);
+  }
+}
+
 async function openInlineCameraModal() {
   if (!inlineCameraModal || !inlineCameraVideo) {
     return;
   }
 
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  if (!hasInlineCameraSupport()) {
+    if (memberCameraFallbackInput) {
+      memberCameraFallbackInput.click();
+      return;
+    }
     setStatus('Tu navegador no permite camara en esta pagina', 'error');
     speak('Tu navegador no permite camara en esta pagina', 'critical');
     return;
@@ -2346,6 +2372,23 @@ if (memberPhotoInput) {
     speak('Foto añadida.', 'critical');
   });
 }
+if (memberCameraFallbackInput) {
+  memberCameraFallbackInput.addEventListener('change', () => {
+    const file =
+      memberCameraFallbackInput.files && memberCameraFallbackInput.files.length
+        ? memberCameraFallbackInput.files[0]
+        : null;
+    if (file) {
+      capturedMemberPhotoFile = null;
+      capturedMemberPhotoName = '';
+      if (memberPhotoInput) {
+        memberPhotoInput.value = '';
+      }
+    }
+    applyMemberPhotoPreview(file);
+    speak('Foto añadida.', 'critical');
+  });
+}
 if (openInlineCameraBtn) {
   openInlineCameraBtn.addEventListener('click', () => {
     openInlineCameraModal();
@@ -2471,6 +2514,7 @@ if (deleteMemberSettingsBtn) {
 initTts();
 initNameSpeechToText();
 initSettingsNameSpeechToText();
+updateInlineCameraUiSupport();
 handleMemberModeChange();
 renderMemberWizardStep();
 ensureSelectedMember();

@@ -330,14 +330,19 @@ h2 {
 }
 
 .photo-action-btn {
-  min-height: 40px;
+  min-height: 108px;
   border: 2px solid #2a5d7b;
-  border-radius: 10px;
+  border-radius: 12px;
   background: linear-gradient(180deg, #dff2ff, #c8e9fb);
   font-weight: 800;
   cursor: pointer;
   display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 3px;
   place-items: center;
+  justify-items: center;
+  text-align: center;
+  padding: 8px;
   position: relative;
   overflow: hidden;
 }
@@ -354,6 +359,47 @@ h2 {
   height: 100%;
   opacity: 0;
   cursor: pointer;
+}
+
+.photo-action-btn.unsupported {
+  border-color: #7a7a7a;
+  background: #ececec;
+  color: #6d6d6d;
+}
+
+.photo-action-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.photo-action-title {
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.photo-action-hint {
+  font-size: 0.74rem;
+  line-height: 1.2;
+  opacity: 0.86;
+}
+
+.visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+}
+
+.photo-camera-note {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  color: #5f4b34;
+  font-weight: 700;
 }
 
 .inline-camera-dialog {
@@ -1058,6 +1104,14 @@ h2 {
 
   .photo-picker-actions {
     grid-template-columns: 1fr;
+  }
+
+  .photo-action-btn {
+    min-height: 92px;
+  }
+
+  .photo-action-icon {
+    font-size: 1.45rem;
   }
 
   .inline-camera-actions {
