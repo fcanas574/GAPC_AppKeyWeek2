@@ -716,6 +716,26 @@ h2 {
   cursor: grabbing;
 }
 
+.money-token.touch-dragging {
+  opacity: 0.35;
+}
+
+.touch-drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 120;
+  pointer-events: none;
+  margin: 0;
+  transform: translate(-50%, -50%) scale(0.92);
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.25));
+}
+
+.touch-drop-over {
+  box-shadow: 0 0 0 4px rgba(21, 113, 69, 0.26);
+  border-color: #157145 !important;
+}
+
 .coin-image {
   width: 74px;
   height: 74px;
@@ -865,6 +885,20 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .app-shell {
+    width: min(980px, 96vw);
+    margin: 14px auto 28px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .member-photo {
+    height: 110px;
+    font-size: 3.6rem;
+  }
+
   .member-form-row.two-cols {
     grid-template-columns: 1fr;
   }
@@ -873,12 +907,6 @@ h2 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-
-@media (max-width: 620px) {
-  .admin-token-rack {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
   .top-bar {
     flex-direction: column;
     align-items: flex-start;
@@ -893,5 +921,139 @@ h2 {
   .action-reset {
     flex: 1 1 auto;
     justify-content: center;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell {
+    width: 96vw;
+    margin: 10px auto 20px;
+  }
+
+  .card {
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  h1 {
+    font-size: clamp(1.25rem, 6vw, 1.6rem);
+  }
+
+  h2 {
+    font-size: 1.22rem;
+  }
+
+  .meeting-block {
+    gap: 6px;
+  }
+
+  .pill-btn,
+  .reset-btn {
+    min-height: 46px;
+    padding: 10px 12px;
+    font-size: 0.94rem;
+  }
+
+  .audio-btn {
+    width: 46px;
+    height: 46px;
+  }
+
+  .member-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .member-photo {
+    height: 92px;
+    font-size: 3rem;
+  }
+
+  .member-name {
+    font-size: 0.95rem;
+  }
+
+  .member-config-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .att-btn {
+    min-height: 52px;
+    font-size: 1.2rem;
+  }
+
+  .selected-member {
+    min-height: 120px;
+    padding: 8px;
+  }
+
+  .selected-member-photo {
+    font-size: 4rem;
+  }
+
+  .selected-member-photo-img {
+    width: 88px;
+    height: 88px;
+  }
+
+  .wallet-row,
+  .jar-grid,
+  .action-row,
+  .member-settings-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .jar {
+    min-height: 148px;
+  }
+
+  .jar-icon {
+    font-size: 3rem;
+  }
+
+  .jar-amount {
+    font-size: 1.22rem;
+  }
+
+  .token-rack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .money-token,
+  .bill-token {
+    min-height: 76px;
+  }
+
+  .coin-image {
+    width: 60px;
+    height: 60px;
+  }
+
+  .bill-image {
+    height: 68px;
+  }
+
+  .coin-value {
+    min-width: 52px;
+    font-size: 0.72rem;
+  }
+
+  .member-admin-dialog,
+  .member-settings-dialog {
+    width: 96vw;
+    max-height: 92vh;
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .wizard-nav-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-token-rack,
+  .member-settings-dialog .admin-token-rack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

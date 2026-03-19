@@ -94,6 +94,9 @@ let settingsNameBaseValue = '';
 let memberWizardLastStep = '';
 let memberWizardCurrentStep = 1;
 const memberWizardTotalSteps = 4;
+let touchDragState = null;
+let touchDragGhost = null;
+let touchDropHighlightEl = null;
 
 const coinImageByValue = {
   '0.01': '/static/static/images/coins/1c_c.jpg',
@@ -1179,6 +1182,247 @@ function renderTokens() {
   tokenRack.innerHTML = tokenEntries.map(tokenTemplate).join('');
 }
 
+function clearTouchDropHighlight() {
+  if (!touchDropHighlightEl) {
+    return;
+  }
+
+  touchDropHighlightEl.classList.remove('touch-drop-over');
+  touchDropHighlightEl.classList.remove('drag-over');
+  touchDropHighlightEl = null;
+}
+
+function setTouchDropHighlight(element, type) {
+  clearTouchDropHighlight();
+  if (!element) {
+    return;
+  }
+
+  if (type === 'jar') {
+    element.classList.add('drag-over');
+  } else {
+    element.classList.add('touch-drop-over');
+  }
+  touchDropHighlightEl = element;
+}
+
+function clearTouchDragGhost() {
+  if (touchDragGhost?.parentNode) {
+    touchDragGhost.parentNode.removeChild(touchDragGhost);
+  }
+  touchDragGhost = null;
+}
+
+function clearTouchDrag() {
+  if (touchDragState?.tokenElement) {
+    touchDragState.tokenElement.classList.remove('touch-dragging');
+  }
+  touchDragState = null;
+  clearTouchDragGhost();
+  clearTouchDropHighlight();
+}
+
+function getTokenSection(tokenElement) {
+  if (tokenRack?.contains(tokenElement)) {
+    return 'payment';
+  }
+  if (memberForm?.contains(tokenElement)) {
+    return 'admin';
+  }
+  if (memberSettingsForm?.contains(tokenElement)) {
+    return 'settings';
+  }
+  return null;
+}
+
+function createTouchDragGhost(tokenElement) {
+  const ghost = tokenElement.cloneNode(true);
+  ghost.classList.add('touch-drag-ghost');
+  ghost.removeAttribute('draggable');
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
+function updateTouchDragGhostPosition(touch) {
+  if (!touchDragGhost) {
+    return;
+  }
+  touchDragGhost.style.left = `${touch.clientX}px`;
+  touchDragGhost.style.top = `${touch.clientY}px`;
+}
+
+function resolveAdminDropTarget(element) {
+  if (!element) {
+    return null;
+  }
+  if (element.closest('#principalTotalInput') || element.closest('#adminPrincipalTokens')) {
+    return {
+      target: 'principal',
+      highlightEl: principalTotalInput || adminPrincipalTokens,
+      highlightType: 'field',
+    };
+  }
+  if (element.closest('#interestTotalInput') || element.closest('#adminInterestTokens')) {
+    return {
+      target: 'interest',
+      highlightEl: interestTotalInput || adminInterestTokens,
+      highlightType: 'field',
+    };
+  }
+  return null;
+}
+
+function resolveSettingsDropTarget(element) {
+  if (!element) {
+    return null;
+  }
+  if (element.closest('#settingsPrincipalTotal') || element.closest('#settingsPrincipalTokens')) {
+    return {
+      target: 'principal',
+      highlightEl: settingsPrincipalTotal || settingsPrincipalTokens,
+      highlightType: 'field',
+    };
+  }
+  if (element.closest('#settingsInterestTotal') || element.closest('#settingsInterestTokens')) {
+    return {
+      target: 'interest',
+      highlightEl: settingsInterestTotal || settingsInterestTokens,
+      highlightType: 'field',
+    };
+  }
+  return null;
+}
+
+function resolvePaymentDropTarget(element) {
+  if (!element) {
+    return null;
+  }
+
+  const jar = element.closest('.jar[data-target]');
+  if (!jar) {
+    return null;
+  }
+
+  return {
+    target: jar.dataset.target,
+    highlightEl: jar,
+    highlightType: 'jar',
+  };
+}
+
+function resolveTouchDrop(section, x, y) {
+  const element = document.elementFromPoint(x, y);
+  if (!element) {
+    return null;
+  }
+
+  if (section === 'payment') {
+    return resolvePaymentDropTarget(element);
+  }
+  if (section === 'admin') {
+    return resolveAdminDropTarget(element);
+  }
+  if (section === 'settings') {
+    return resolveSettingsDropTarget(element);
+  }
+
+  return null;
+}
+
+function applyTouchDrop(section, target, value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return;
+  }
+
+  if (section === 'payment') {
+    addToDraft(target, value);
+    return;
+  }
+
+  if (section === 'admin') {
+    addToLoanInput(target, value);
+    const targetLabel = target === 'principal' ? 'préstamo' : 'interés';
+    speak(`Monto añadido a ${targetLabel}: ${amountToSpeech(value)}.`, 'critical');
+    return;
+  }
+
+  if (section === 'settings') {
+    addToSettingsLoanInput(target, value);
+    const targetLabel = target === 'principal' ? 'préstamo principal' : 'interés';
+    speak(`Monto añadido a ${targetLabel}: ${amountToSpeech(value)}.`, 'critical');
+  }
+}
+
+function onTokenTouchStart(event) {
+  if (event.touches.length !== 1) {
+    return;
+  }
+
+  const token = event.target.closest('.money-token');
+  if (!token) {
+    return;
+  }
+
+  const value = Number(token.dataset.value);
+  const section = getTokenSection(token);
+  if (!Number.isFinite(value) || value <= 0 || !section) {
+    return;
+  }
+
+  touchDragState = {
+    value,
+    section,
+    tokenElement: token,
+    lastDrop: null,
+  };
+  touchDragGhost = createTouchDragGhost(token);
+  token.classList.add('touch-dragging');
+  updateTouchDragGhostPosition(event.touches[0]);
+  event.preventDefault();
+}
+
+function onTokenTouchMove(event) {
+  if (!touchDragState || event.touches.length !== 1) {
+    return;
+  }
+
+  const touch = event.touches[0];
+  updateTouchDragGhostPosition(touch);
+  const drop = resolveTouchDrop(touchDragState.section, touch.clientX, touch.clientY);
+  touchDragState.lastDrop = drop;
+
+  if (drop?.highlightEl) {
+    setTouchDropHighlight(drop.highlightEl, drop.highlightType);
+  } else {
+    clearTouchDropHighlight();
+  }
+
+  event.preventDefault();
+}
+
+function onTokenTouchEnd(event) {
+  if (!touchDragState) {
+    return;
+  }
+
+  const touch = event.changedTouches?.[0];
+  const fallbackDrop = touch
+    ? resolveTouchDrop(touchDragState.section, touch.clientX, touch.clientY)
+    : null;
+  const finalDrop = fallbackDrop || touchDragState.lastDrop;
+
+  if (finalDrop?.target) {
+    applyTouchDrop(touchDragState.section, finalDrop.target, touchDragState.value);
+  }
+
+  clearTouchDrag();
+  event.preventDefault();
+}
+
+function onTokenTouchCancel() {
+  clearTouchDrag();
+}
+
 function renderAdminLoanTokens() {
   const tokenEntries = buildTokenEntries();
   const html = tokenEntries
@@ -1771,6 +2015,11 @@ bindAdminTokenRack(adminPrincipalTokens, 'principal');
 bindAdminTokenRack(adminInterestTokens, 'interest');
 bindSettingsTokenRack(settingsPrincipalTokens, 'principal');
 bindSettingsTokenRack(settingsInterestTokens, 'interest');
+
+document.addEventListener('touchstart', onTokenTouchStart, { passive: false });
+document.addEventListener('touchmove', onTokenTouchMove, { passive: false });
+document.addEventListener('touchend', onTokenTouchEnd, { passive: false });
+document.addEventListener('touchcancel', onTokenTouchCancel, { passive: true });
 
 tokenRack.addEventListener('dragstart', (event) => {
   const token = event.target.closest('.money-token');
