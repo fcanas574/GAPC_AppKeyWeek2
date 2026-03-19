@@ -130,7 +130,7 @@ def create_app() -> Flask:
 		gender = normalize_gender(request.form.get("gender"))
 		principal_raw = request.form.get("principal_total")
 		interest_raw = request.form.get("interest_total")
-		photo = request.files.get("photo")
+		photo = request.files.get("photo") or request.files.get("photo_camera")
 
 		try:
 			principal_total = round(float(principal_raw), 2)

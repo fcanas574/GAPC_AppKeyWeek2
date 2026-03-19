@@ -50,8 +50,7 @@ const adminInterestTokens = document.getElementById('adminInterestTokens');
 const clearPrincipalBtn = document.getElementById('clearPrincipalBtn');
 const clearInterestBtn = document.getElementById('clearInterestBtn');
 const memberPhotoInput = document.getElementById('memberPhotoInput');
-const chooseGalleryBtn = document.getElementById('chooseGalleryBtn');
-const takePhotoBtn = document.getElementById('takePhotoBtn');
+const memberCameraInput = document.getElementById('memberCameraInput');
 const memberPhotoName = document.getElementById('memberPhotoName');
 const memberPhotoPreviewWrap = document.getElementById('memberPhotoPreviewWrap');
 const memberPhotoPreview = document.getElementById('memberPhotoPreview');
@@ -931,6 +930,9 @@ function closeMemberAdminModal() {
   if (memberPhotoInput) {
     memberPhotoInput.value = '';
   }
+  if (memberCameraInput) {
+    memberCameraInput.value = '';
+  }
   clearMemberPhotoPreview();
 }
 
@@ -953,19 +955,26 @@ function clearMemberPhotoPreview() {
   }
 }
 
-function openMemberPhotoPicker(source) {
-  if (!memberPhotoInput) {
+function applyMemberPhotoPreview(file) {
+  if (!file) {
+    clearMemberPhotoPreview();
     return;
   }
 
-  memberPhotoInput.setAttribute('accept', 'image/*');
-  if (source === 'camera') {
-    memberPhotoInput.setAttribute('capture', 'environment');
-  } else {
-    memberPhotoInput.removeAttribute('capture');
+  if (memberPhotoPreviewObjectUrl) {
+    URL.revokeObjectURL(memberPhotoPreviewObjectUrl);
   }
 
-  memberPhotoInput.click();
+  memberPhotoPreviewObjectUrl = URL.createObjectURL(file);
+  if (memberPhotoPreview) {
+    memberPhotoPreview.src = memberPhotoPreviewObjectUrl;
+  }
+  if (memberPhotoPreviewWrap) {
+    memberPhotoPreviewWrap.classList.remove('hidden');
+  }
+  if (memberPhotoName) {
+    memberPhotoName.textContent = file.name || 'Foto seleccionada';
+  }
 }
 
 function announceMemberWizardStep() {
@@ -2211,37 +2220,21 @@ if (memberForm) {
 if (memberPhotoInput) {
   memberPhotoInput.addEventListener('change', () => {
     const file = memberPhotoInput.files && memberPhotoInput.files.length ? memberPhotoInput.files[0] : null;
-    if (!file) {
-      clearMemberPhotoPreview();
-      return;
+    if (file && memberCameraInput) {
+      memberCameraInput.value = '';
     }
-
-    if (memberPhotoPreviewObjectUrl) {
-      URL.revokeObjectURL(memberPhotoPreviewObjectUrl);
-    }
-
-    memberPhotoPreviewObjectUrl = URL.createObjectURL(file);
-    if (memberPhotoPreview) {
-      memberPhotoPreview.src = memberPhotoPreviewObjectUrl;
-    }
-    if (memberPhotoPreviewWrap) {
-      memberPhotoPreviewWrap.classList.remove('hidden');
-    }
-    if (memberPhotoName) {
-      memberPhotoName.textContent = file.name || 'Foto seleccionada';
-    }
-
+    applyMemberPhotoPreview(file);
     speak('Foto añadida.', 'critical');
   });
 }
-if (chooseGalleryBtn) {
-  chooseGalleryBtn.addEventListener('click', () => {
-    openMemberPhotoPicker('gallery');
-  });
-}
-if (takePhotoBtn) {
-  takePhotoBtn.addEventListener('click', () => {
-    openMemberPhotoPicker('camera');
+if (memberCameraInput) {
+  memberCameraInput.addEventListener('change', () => {
+    const file = memberCameraInput.files && memberCameraInput.files.length ? memberCameraInput.files[0] : null;
+    if (file && memberPhotoInput) {
+      memberPhotoInput.value = '';
+    }
+    applyMemberPhotoPreview(file);
+    speak('Foto añadida.', 'critical');
   });
 }
 if (memberWizardPrevBtn) {

@@ -336,6 +336,10 @@ h2 {
   background: linear-gradient(180deg, #dff2ff, #c8e9fb);
   font-weight: 800;
   cursor: pointer;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .photo-action-btn.camera {
@@ -343,15 +347,13 @@ h2 {
   background: linear-gradient(180deg, #dbf6e6, #bde9d2);
 }
 
-.file-input-hidden {
+.photo-action-btn.file-trigger input[type='file'] {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  border: 0;
-  padding: 0;
-  clip: rect(0 0 0 0);
-  overflow: hidden;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .photo-file-label {
