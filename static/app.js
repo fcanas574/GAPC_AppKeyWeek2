@@ -50,6 +50,11 @@ const adminInterestTokens = document.getElementById('adminInterestTokens');
 const clearPrincipalBtn = document.getElementById('clearPrincipalBtn');
 const clearInterestBtn = document.getElementById('clearInterestBtn');
 const memberPhotoInput = document.getElementById('memberPhotoInput');
+const chooseGalleryBtn = document.getElementById('chooseGalleryBtn');
+const takePhotoBtn = document.getElementById('takePhotoBtn');
+const memberPhotoName = document.getElementById('memberPhotoName');
+const memberPhotoPreviewWrap = document.getElementById('memberPhotoPreviewWrap');
+const memberPhotoPreview = document.getElementById('memberPhotoPreview');
 const memberSaveBtn = document.querySelector('#memberForm .member-save-btn');
 const wizardStepRows = Array.from(document.querySelectorAll('.member-wizard-step'));
 const resetDraftBtn = document.getElementById('resetDraftBtn');
@@ -97,6 +102,7 @@ const memberWizardTotalSteps = 4;
 let touchDragState = null;
 let touchDragGhost = null;
 let touchDropHighlightEl = null;
+let memberPhotoPreviewObjectUrl = '';
 
 const coinImageByValue = {
   '0.01': '/static/static/images/coins/1c_c.jpg',
@@ -922,6 +928,44 @@ function closeMemberAdminModal() {
   memberAdminModal.setAttribute('aria-hidden', 'true');
   memberWizardLastStep = '';
   memberWizardCurrentStep = 1;
+  if (memberPhotoInput) {
+    memberPhotoInput.value = '';
+  }
+  clearMemberPhotoPreview();
+}
+
+function clearMemberPhotoPreview() {
+  if (memberPhotoPreviewObjectUrl) {
+    URL.revokeObjectURL(memberPhotoPreviewObjectUrl);
+    memberPhotoPreviewObjectUrl = '';
+  }
+
+  if (memberPhotoPreview) {
+    memberPhotoPreview.removeAttribute('src');
+  }
+
+  if (memberPhotoPreviewWrap) {
+    memberPhotoPreviewWrap.classList.add('hidden');
+  }
+
+  if (memberPhotoName) {
+    memberPhotoName.textContent = 'Sin foto seleccionada';
+  }
+}
+
+function openMemberPhotoPicker(source) {
+  if (!memberPhotoInput) {
+    return;
+  }
+
+  memberPhotoInput.setAttribute('accept', 'image/*');
+  if (source === 'camera') {
+    memberPhotoInput.setAttribute('capture', 'environment');
+  } else {
+    memberPhotoInput.removeAttribute('capture');
+  }
+
+  memberPhotoInput.click();
 }
 
 function announceMemberWizardStep() {
@@ -1799,6 +1843,7 @@ async function saveMember(event) {
     if (memberPhotoInput) {
       memberPhotoInput.value = '';
     }
+    clearMemberPhotoPreview();
   } catch (error) {
     setStatus(error.message, 'error');
     speak(error.message, 'critical');
@@ -2165,9 +2210,38 @@ if (memberForm) {
 }
 if (memberPhotoInput) {
   memberPhotoInput.addEventListener('change', () => {
-    if (memberPhotoInput.files && memberPhotoInput.files.length) {
-      speak('Foto añadida.', 'critical');
+    const file = memberPhotoInput.files && memberPhotoInput.files.length ? memberPhotoInput.files[0] : null;
+    if (!file) {
+      clearMemberPhotoPreview();
+      return;
     }
+
+    if (memberPhotoPreviewObjectUrl) {
+      URL.revokeObjectURL(memberPhotoPreviewObjectUrl);
+    }
+
+    memberPhotoPreviewObjectUrl = URL.createObjectURL(file);
+    if (memberPhotoPreview) {
+      memberPhotoPreview.src = memberPhotoPreviewObjectUrl;
+    }
+    if (memberPhotoPreviewWrap) {
+      memberPhotoPreviewWrap.classList.remove('hidden');
+    }
+    if (memberPhotoName) {
+      memberPhotoName.textContent = file.name || 'Foto seleccionada';
+    }
+
+    speak('Foto añadida.', 'critical');
+  });
+}
+if (chooseGalleryBtn) {
+  chooseGalleryBtn.addEventListener('click', () => {
+    openMemberPhotoPicker('gallery');
+  });
+}
+if (takePhotoBtn) {
+  takePhotoBtn.addEventListener('click', () => {
+    openMemberPhotoPicker('camera');
   });
 }
 if (memberWizardPrevBtn) {

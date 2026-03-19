@@ -105,7 +105,19 @@
 
               <div class="member-form-row member-wizard-step" data-step="2">
                 <label for="memberPhotoInput">Foto (opcional)</label>
-                <input id="memberPhotoInput" name="photo" type="file" accept="image/*" />
+                <div class="photo-picker-actions">
+                  <button id="chooseGalleryBtn" class="photo-action-btn" type="button">
+                    Subir de galeria
+                  </button>
+                  <button id="takePhotoBtn" class="photo-action-btn camera" type="button">
+                    Tomar foto
+                  </button>
+                </div>
+                <input id="memberPhotoInput" class="file-input-hidden" name="photo" type="file" accept="image/*" />
+                <p id="memberPhotoName" class="photo-file-label">Sin foto seleccionada</p>
+                <div id="memberPhotoPreviewWrap" class="member-photo-preview hidden">
+                  <img id="memberPhotoPreview" alt="Vista previa de foto" />
+                </div>
               </div>
 
               <div class="member-form-row two-cols member-wizard-step" data-step="3">
